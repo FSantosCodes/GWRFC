@@ -37,14 +37,27 @@ GWRFC <- function(
                   "rgeos","scales","doParallel","NbClust","spgwr","NbClust",
                   "parallel","plyr","spdep","reshape","rgdal","mclust","gtools"))
 
+  ##### DEBUGGING #####
+
+  #input_shapefile = "C:/DATA/Geoinformation/IMAGENES_DDF/7_CAUSES/analysis/10_experiments/1_consolided/def_consolidated.shp"
+  #remove_columns = c("ID_grid","L_oth")
+  #dependent_varName = "fao"
+  #kernel_type = "exponential"
+  #kernel_adaptative = T
+  #kernel_bandwidth = 100
+  #clusters_LVI = 2
+  #number_cores = 3
+  #output_folder = "C:/DATA/Geoinformation/IMAGENES_DDF/7_CAUSES/analysis/10_experiments/2_def"
+
   ##### PREPARE DATA #####
 
   #random
   set.seed(666)
-  #folders
-  dir.create(output_folder,showWarnings = T, recursive = T)
-  temp.folder <- paste0(output_folder,"/temp");dir.create(temp.folder,showWarnings = F, recursive = T)
-  unlink(list.files(temp.folder,full.names=T),recursive = T, force = T)
+  #folder
+  dir.create(output_folder,showWarnings = F, recursive = T)
+  if(file.exists(paste0(output_folder,"/progress.txt"))){
+    unlink(paste0(output_folder,"/progress.txt"),recursive = T, force = T)
+  }
   #read shp
   model.shp <- shapefile(input_shapefile)
   #remove columns?
@@ -85,20 +98,20 @@ GWRFC <- function(
     return(x)
   }
   corrupted.cases <- function(){
-    cell.names <- c("ACC","KAPPA")
-    cell.names <- c(cell.vars,"BEST","PRED",cell.names)
-    cell.out <- as.data.frame(matrix(nrow=1,ncol=length(cell.vars)+4))
+    cell.names <- c(cell.vars,"BEST","DEP","PRED","ACC","KAPPA")
+    cell.out <- as.data.frame(matrix(nrow=1,ncol=length(cell.vars)+5))
     names(cell.out) <- cell.names
+    cell.out$DEP <- as.character(cell.i[,1])
     return(cell.out)
   }
 
   #### GW RANDOM FOREST ####
 
-  print("start processing...")
+  print("Start processing...")
   #process
   cl <- makeCluster(number_cores)
   registerDoParallel(cl)
-  foreach(i=1:nrow(model.data),.packages=c("ranger","scales","caret","GWmodel"),.errorhandling="pass") %dopar% {
+  gwc.extract <- foreach(i=1:nrow(model.data),.packages=c("ranger","scales","caret","GWmodel"),.errorhandling="pass") %dopar% {
     #subset by kernel_bandwidth
     cell.data <- model.data
     cell.data$dist <- dmat[i,]
@@ -109,8 +122,8 @@ GWRFC <- function(
     }
     #get 'i' observation
     cell.i <- cell.data[1,]
-    #remove null classes + unique classes
-    unique.class <- names(which(table(cell.data$fao)==1))
+    #remove clases with a low number of observations (ok >= 5) + drop unused levels
+    unique.class <- names(which(table(cell.data$fao)<=5))
     if(length(unique.class)>=1){
       cell.data <- cell.data[!cell.data$fao %in% unique.class,]
     }
@@ -183,18 +196,19 @@ GWRFC <- function(
         cell.out$KAPPA <- caret::confusionMatrix(cell.rf$confusion.matrix)$overall[2]
       }
     }
-    #save csv (memory proof)
-    out.csv <- paste0(temp.folder,"/",i,".csv")
-    write.csv(cell.out,out.csv,row.names=F)
+    #status text
+    cat(paste0(as.character(i)," of ",nrow(model.data)," \n"),
+        file=paste0(output_folder,"/progress.txt"), append=TRUE)
+    #end
+    return(cell.out)
   }
   stopCluster(cl)
   #extract data results
-  gwc.data <- mixedsort(list.files(temp.folder,full.names=T,pattern=".csv"))
-  gwc.data <- rbind.fill(lapply(gwc.data, read.csv, header=TRUE))
+  gwc.data <- do.call("rbind.data.frame",gwc.extract)
 
   #### CLUSTERING ####
 
-  print("start clustering...")
+  print("Start clustering...")
   #get variables & NA not for use in clustering
   index.acc <- (length(gwc.data) - 4):length(gwc.data)
   index.na <- complete.cases(gwc.data)
@@ -218,7 +232,7 @@ GWRFC <- function(
 
   #### SAVE SHAPEFILE ####
 
-  print("start saving...")
+  print("Start saving...")
   #save shapefile
   model.shp@data <- gwc.data
   output.name <- paste0(output_folder,"/GWRFC_",
@@ -226,8 +240,13 @@ GWRFC <- function(
                         kernel_bandwidth,"_",
                         kernel_type,".shp")
   shapefile(model.shp,output.name,overwrite=T)
+  #warning
+  if(length(which(is.na(model.shp@data$PRED)))!=0){
+    warning(paste0("kernel_bandwidth to short for some iterations and ",
+                   length(which(is.na(model.shp@data$PRED))),
+                   " observations were not possible to evaluate."))
+  }
   #end
   print(paste0("check file: ",basename(output.name)))
   print("****GWRFC end sucessfully*****")
-  unlink(temp.folder,recursive = T, force = T)
 }
