@@ -35,17 +35,16 @@ GWRFC <- function(
 
   get.libraries(c("raster","GWmodel","caret","stringr","ranger","zoo",
                   "rgeos","scales","doParallel","NbClust","spgwr","NbClust",
-                  "parallel","plyr","spdep","reshape","rgdal","mclust"))
+                  "parallel","plyr","spdep","reshape","rgdal","mclust","gtools"))
 
   ##### PREPARE DATA #####
 
   #random
   set.seed(666)
-  #folder
+  #folders
   dir.create(output_folder,showWarnings = T, recursive = T)
-  if(file.exists(paste0(output_folder,"/progress.txt"))){
-    unlink(paste0(output_folder,"/progress.txt"),recursive = T, force = T)
-  }
+  temp.folder <- paste0(output_folder,"/temp");dir.create(temp.folder,showWarnings = F, recursive = T)
+  unlink(list.files(temp.folder,full.names=T),recursive = T, force = T)
   #read shp
   model.shp <- shapefile(input_shapefile)
   #remove columns?
@@ -99,7 +98,7 @@ GWRFC <- function(
   #process
   cl <- makeCluster(number_cores)
   registerDoParallel(cl)
-  gwc.extract <- foreach(i=1:nrow(model.data),.packages=c("ranger","scales","caret","GWmodel"),.errorhandling="pass") %dopar% {
+  foreach(i=1:nrow(model.data),.packages=c("ranger","scales","caret","GWmodel"),.errorhandling="pass") %dopar% {
     #subset by kernel_bandwidth
     cell.data <- model.data
     cell.data$dist <- dmat[i,]
@@ -184,19 +183,18 @@ GWRFC <- function(
         cell.out$KAPPA <- caret::confusionMatrix(cell.rf$confusion.matrix)$overall[2]
       }
     }
-    #status text
-    cat(paste0(as.character(i)," of ",nrow(model.data)," \n"),
-        file=paste0(output_folder,"/progress.txt"), append=TRUE)
-    #end
-    return(cell.out)
+    #save csv (memory proof)
+    out.csv <- paste0(temp.folder,"/",i,".csv")
+    write.csv(cell.out,out.csv,row.names=F)
   }
   stopCluster(cl)
+  #extract data results
+  gwc.data <- mixedsort(list.files(temp.folder,full.names=T,pattern=".csv"))
+  gwc.data <- rbind.fill(lapply(gwc.data, read.csv, header=TRUE))
 
   #### CLUSTERING ####
 
   print("start clustering...")
-  #extract data results
-  gwc.data <- do.call("rbind.data.frame",gwc.extract)
   #get variables & NA not for use in clustering
   index.acc <- (length(gwc.data) - 4):length(gwc.data)
   index.na <- complete.cases(gwc.data)
@@ -231,4 +229,5 @@ GWRFC <- function(
   #end
   print(paste0("check file: ",basename(output.name)))
   print("****GWRFC end sucessfully*****")
+  unlink(temp.folder,recursive = T, force = T)
 }
