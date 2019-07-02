@@ -4,7 +4,7 @@
 \alias{GWRFC}
 \title{Geographically weighted Random Forest Classification (GWRFC)}
 \usage{
-GWRFC(input_shapefile, remove_columns, dependent_varName,
+GWRFC(input_shapefile, remove_columns = NA, dependent_varName,
   kernel_type = "exponential", kernel_adaptative = T, kernel_bandwidth,
   clusters_LVI = "auto", number_cores = 1, output_folder)
 }
