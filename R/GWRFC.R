@@ -110,7 +110,7 @@ GWRFC <- function(
   #process
   cl <- makeCluster(number_cores)
   registerDoParallel(cl)
-  gwc.extract <- foreach(i=nrow(model.shp@data),.packages=c("ranger","scales","caret","GWmodel"),.errorhandling="pass") %dopar% {
+  gwc.extract <- foreach(i=1:nrow(model.shp@data),.packages=c("ranger","scales","caret","GWmodel"),.errorhandling="pass") %dopar% {
     #subset by kernel_bandwidth
     cell.data <- model.shp@data
     cell.data$dist <- dmat[i,]
