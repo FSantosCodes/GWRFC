@@ -39,15 +39,15 @@ GWRFC <- function(
 
   ##### DEBUGGING #####
 
-  #input_shapefile = "C:/DATA/Geoinformation/IMAGENES_DDF/7_CAUSES/analysis/10_experiments/1_consolided/def_consolidated.shp"
-  #remove_columns = c("ID_grid","L_oth")
-  #dependent_varName = "fao"
-  #kernel_type = "exponential"
-  #kernel_adaptative = T
-  #kernel_bandwidth = 100
-  #clusters_LVI = 2
-  #number_cores = 3
-  #output_folder = "C:/DATA/Geoinformation/IMAGENES_DDF/7_CAUSES/analysis/10_experiments/2_def"
+  input_shapefile = "C:/DATA/poli/GWRFC/shp/Puntos_Final2.shp"
+  remove_columns = NA
+  dependent_varName = "Class"
+  kernel_type = "exponential"
+  kernel_adaptative = T
+  kernel_bandwidth = 400
+  clusters_LVI = "auto"
+  number_cores = 3
+  output_folder = "C:/DATA/poli/GWRFC/corrida"
 
   ##### PREPARE DATA #####
 
@@ -78,9 +78,6 @@ GWRFC <- function(
   #prepare data + distance matrix
   model.shp <- model.shp[,c(model.dep,model.ind)]
   model.shp@data[,1] <- factor(model.shp@data[,1])
-  if(length(levels(model.shp@data[,1]))>10){
-    stop("number of classes in the dependent variable are greater than 10. Consider its discretization or a regression analysis.")
-  }
   dmat <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp))
   model.data <- model.shp@data
 
@@ -122,12 +119,12 @@ GWRFC <- function(
     }
     #get 'i' observation
     cell.i <- cell.data[1,]
-    #remove clases with a low number of observations (ok >= 5) + drop unused levels
-    unique.class <- names(which(table(cell.data$fao)<=5))
+    #remove clases with a low number of observations (ok <= 5) + drop unused levels
+    unique.class <- names(which(table(cell.data[,1])<=5))
     if(length(unique.class)>=1){
-      cell.data <- cell.data[!cell.data$fao %in% unique.class,]
+      cell.data <- cell.data[!cell.data[,1] %in% unique.class,]
     }
-    cell.data$fao <- droplevels(cell.data$fao)
+    cell.data[,1] <- droplevels(cell.data[,1])
     #CORRUPTED CASE 1: only one observation
     if(nrow(cell.data)==1){
       cell.out <- corrupted.cases()
