@@ -102,6 +102,40 @@ GWRFC <- function(
     cell.out$DEP <- as.character(cell.i[,1])
     return(cell.out)
   }
+  apply.adaptative <- function(){
+    #first run
+    cell.data <- model.shp@data
+    cell.data$dist <- dmat[i,]
+    cell.data <- cell.data[order(cell.data$dist)[1:kernel_bandwidth],]
+    num.classes <- length(unique(cell.data[,1]))
+    #expand kernel
+    kernel.expand <- kernel_bandwidth
+    while(num.classes==1){
+      cell.data <- model.shp@data
+      cell.data$dist <- dmat[i,]
+      kernel.expand <- kernel.expand + (kernel_bandwidth/10)
+      cell.data <- cell.data[order(cell.data$dist)[1:kernel.expand],]
+      num.classes <- length(unique(cell.data[,1]))
+    }
+    return(cell.data)
+  }
+  apply.fixed <- function(){
+    #first run
+    cell.data <- model.shp@data
+    cell.data$dist <- dmat[i,]
+    cell.data <- cell.data[cell.data$dist < kernel_bandwidth,]
+    num.classes <- length(unique(cell.data[,1]))
+    #expand kernel
+    kernel.expand <- kernel_bandwidth
+    while(num.classes==1){
+      cell.data <- model.shp@data
+      cell.data$dist <- dmat[i,]
+      kernel.expand <- kernel.expand + (kernel_bandwidth/10)
+      cell.data <- cell.data[cell.data$dist < kernel.expand,]
+      num.classes <- length(unique(cell.data[,1]))
+    }
+    return(cell.data)
+  }
 
   #### GW RANDOM FOREST ####
 
@@ -112,20 +146,13 @@ GWRFC <- function(
   registerDoParallel(cl)
   gwc.extract <- foreach(i=1:nrow(model.shp@data),.packages=c("ranger","scales","caret","GWmodel"),.errorhandling="pass") %dopar% {
     #subset by kernel_bandwidth
-    cell.data <- model.shp@data
-    cell.data$dist <- dmat[i,]
     if(kernel_adaptative){
-      cell.data <- cell.data[order(cell.data$dist)[1:kernel_bandwidth],]
+      cell.data <- apply.adaptative()
     }else{
-      cell.data <- cell.data[cell.data$dist < kernel_bandwidth,]
+      cell.data <- apply.fixed()
     }
-    #get 'i' observation
+    #get 'i' observation + drop unused levels
     cell.i <- cell.data[1,]
-    #remove clases with a low number of observations (ok <= 5) + drop unused levels
-    unique.class <- names(which(table(cell.data[,1])<=5))
-    if(length(unique.class)>=1){
-      cell.data <- cell.data[!cell.data[,1] %in% unique.class,]
-    }
     cell.data[,1] <- droplevels(cell.data[,1])
     #CORRUPTED CASE 1: only one observation
     if(nrow(cell.data)==1){
