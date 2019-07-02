@@ -51,6 +51,8 @@ GWRFC <- function(
 
   ##### PREPARE DATA #####
 
+  print("Reading data...")
+
   #random
   set.seed(666)
   #folder
@@ -79,7 +81,6 @@ GWRFC <- function(
   model.shp <- model.shp[,c(model.dep,model.ind)]
   model.shp@data[,1] <- factor(model.shp@data[,1])
   dmat <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp))
-  model.data <- model.shp@data
 
   ##### FUNCTIONS ####
 
@@ -105,12 +106,13 @@ GWRFC <- function(
   #### GW RANDOM FOREST ####
 
   print("Start processing...")
+
   #process
   cl <- makeCluster(number_cores)
   registerDoParallel(cl)
-  gwc.extract <- foreach(i=1:nrow(model.data),.packages=c("ranger","scales","caret","GWmodel"),.errorhandling="pass") %dopar% {
+  gwc.extract <- foreach(i=nrow(model.shp@data),.packages=c("ranger","scales","caret","GWmodel"),.errorhandling="pass") %dopar% {
     #subset by kernel_bandwidth
-    cell.data <- model.data
+    cell.data <- model.shp@data
     cell.data$dist <- dmat[i,]
     if(kernel_adaptative){
       cell.data <- cell.data[order(cell.data$dist)[1:kernel_bandwidth],]
@@ -194,7 +196,7 @@ GWRFC <- function(
       }
     }
     #status text
-    cat(paste0(as.character(i)," of ",nrow(model.data)," \n"),
+    cat(paste0(as.character(i)," of ",nrow(model.shp@data)," \n"),
         file=paste0(output_folder,"/progress.txt"), append=TRUE)
     #end
     return(cell.out)
@@ -206,6 +208,7 @@ GWRFC <- function(
   #### CLUSTERING ####
 
   print("Start clustering...")
+
   #get variables & NA not for use in clustering
   index.acc <- (length(gwc.data) - 4):length(gwc.data)
   index.na <- complete.cases(gwc.data)
@@ -230,6 +233,7 @@ GWRFC <- function(
   #### SAVE SHAPEFILE ####
 
   print("Start saving...")
+
   #save shapefile
   model.shp@data <- gwc.data
   output.name <- paste0(output_folder,"/GWRFC_",
