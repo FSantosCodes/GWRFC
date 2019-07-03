@@ -33,21 +33,21 @@ GWRFC <- function(
     }
   }
 
-  get.libraries(c("raster","GWmodel","caret","stringr","ranger","zoo",
+  get.libraries(c("raster","GWmodel","caret","stringr","ranger","zoo","ggplot2",
                   "rgeos","scales","doParallel","NbClust","spgwr","NbClust",
                   "parallel","plyr","spdep","reshape","rgdal","mclust","gtools"))
 
   ##### DEBUGGING #####
 
-  #input_shapefile = "C:/DATA/poli/GWRFC/shp/Puntos_Final2.shp"
-  #remove_columns = NA
-  #dependent_varName = "Class"
-  #kernel_type = "exponential"
-  #kernel_adaptative = T
-  #kernel_bandwidth = 400
-  #clusters_LVI = "auto"
-  #number_cores = 3
-  #output_folder = "C:/DATA/poli/GWRFC/corrida"
+  input_shapefile = "C:/DATA/poli/GWRFC/shp/Puntos_2001.shp"
+  remove_columns = NA
+  dependent_varName = "Class"
+  kernel_type = "exponential"
+  kernel_adaptative = T
+  kernel_bandwidth = 50
+  clusters_LVI = "auto"
+  number_cores = 3
+  output_folder = "C:/DATA/poli/GWRFC/corrida/3_test"
 
   ##### PREPARE DATA #####
 
@@ -135,6 +135,47 @@ GWRFC <- function(
       num.classes <- length(unique(cell.data[,1]))
     }
     return(cell.data)
+  }
+  radar.plot <- function(){
+    #fix polar coord
+    cp <- coord_polar(theta = "y")
+    cp$is_free <- function() TRUE
+    #plot
+    p <- ggplot(gwc.report, aes(x=value,y=variable,
+                                linetype=clusters,
+                                group=clusters,
+                                color=clusters)) +
+      theme_bw() +
+      theme(plot.title = element_text(size = 15),
+            #panel
+            panel.grid.major = element_line(size = 0.5, linetype = 'dotted',colour = "black"),
+            #legend
+            legend.title=element_text(size=15),
+            legend.text=element_text(size=15),
+            legend.key = element_rect(colour = "black"),
+            legend.position="bottom",
+            #axis x
+            axis.title.x=element_text(size=15),
+            axis.text.x=element_text(hjust = 1,size=15),
+            #axis y
+            axis.title.y=element_text(size=15),
+            axis.text.y=element_text(hjust = 1,size=15),
+            strip.text.y=element_text(size=15),
+            #facet titles off
+            strip.background = element_blank(),
+            strip.text.x = element_blank(),
+            #margins
+            plot.margin=unit(c(0,0,0,0),"cm")) +
+      #legend columns
+      guides(col = guide_legend(nrow=2,byrow=T)) +
+      guides(fill = "none",linetype="none") +
+      #shapes
+      geom_polygon(fill=NA,size=0.8) +
+      #other
+      #scale_linetype_manual("",values=c("solid","dashed")) +
+      labs(y="Variables",x="Average importance [%]") +
+      cp
+    return(p)
   }
 
   #### GW RANDOM FOREST ####
@@ -256,6 +297,17 @@ GWRFC <- function(
     gwc.data$CLUSTER <- NA
     gwc.data[index.na,]$CLUSTER <- gwc.clus$classification
   }
+
+  #### CREATE REPORT ####
+
+  print("Start report...")
+
+  #from cluster means
+  gwc.report <- as.data.frame(t(gwc.clus$parameters$mean))
+  gwc.report$clusters <- paste0("CLUS_",1:clusters_LVI)
+  gwc.report <- melt(gwc.report,id.vars = "clusters")
+  output.name <- paste0(output_folder,"/clusters_VarImp.jpg")
+  ggsave(filename=output.name,radar.plot(),dpi = 300, width=32,height=32,units="cm")
 
   #### SAVE SHAPEFILE ####
 
