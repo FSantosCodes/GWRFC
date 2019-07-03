@@ -39,15 +39,18 @@ GWRFC <- function(
 
   ##### DEBUGGING #####
 
-  input_shapefile = "C:/DATA/poli/GWRFC/shp/Puntos_2001.shp"
-  remove_columns = NA
-  dependent_varName = "Class"
-  kernel_type = "exponential"
-  kernel_adaptative = T
-  kernel_bandwidth = 50
-  clusters_LVI = "auto"
-  number_cores = 3
-  output_folder = "C:/DATA/poli/GWRFC/corrida/3_test"
+  debug <- F
+  if(debug){
+    input_shapefile = "C:/DATA/poli/GWRFC/shp/Puntos_2001.shp"
+    remove_columns = NA
+    dependent_varName = "Class"
+    kernel_type = "exponential"
+    kernel_adaptative = T
+    kernel_bandwidth = 50
+    clusters_LVI = "auto"
+    number_cores = 3
+    output_folder = "C:/DATA/poli/GWRFC/corrida/3_test"
+  }
 
   ##### PREPARE DATA #####
 
