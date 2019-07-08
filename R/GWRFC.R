@@ -1,14 +1,13 @@
 #'@title Geographically weighted Random Forest Classification (GWRFC)
 #'@description CHECK...
-#'@param input_shapefile spatialpolygonsdataframe. Input shapefile with dependent and independent variables
+#'@param input_shapefile string. Input shapefile with dependent and independent variables. It can be polygons or points based.
 #'@param remove_columns string. Remove specific variables from 'input_shapefile'. Variables are identified by column name. NA ignores column remove.
 #'@param dependent_varName string. Dependent variable name. Must exists at 'input_shapefile'.
 #'@param kernel_type string. Kernel type to apply in GWRFC. It can be: 'gaussian', 'exponential', 'bisquare' or 'tricube'.
 #'@param kernel_adaptative logical. Is the kernel adaptative? otherwise it is considered as fixed.
 #'@param kernel_bandwidth numeric. Defines kernel bandwidth. If 'kernel_adaptative' is TRUE, define the number of local observations in the kernel, otherwise define its distance.
-#'@param clusters_LVI numeric. Number of clusters for summarize local variables importance (LVI). If it is defined as 'auto' (default), it is calculated via Nbclust package.
-#'@param number_cores numeric. Number of cores for parallel processing. Cores are register and operated via doParallel, foreach and parallel packages.
-#'@param output_folder string. Output folder where GWRFC results are stored.
+#'@param number_cores numeric. Number of cores for parallel processing. Cores are register and operated via doParallel, foreach and parallel packages. Be careful with increasing numbers of cores, as RAM memory may be not enough.
+#'@param output_folder string. Output folder where GWRFC outputs will be stored.
 #'@export
 
 GWRFC <- function(
@@ -18,7 +17,6 @@ GWRFC <- function(
   kernel_type = "exponential",
   kernel_adaptative = T,
   kernel_bandwidth,
-  clusters_LVI = 'auto',
   number_cores = 1,
   output_folder
 ){
@@ -34,7 +32,7 @@ GWRFC <- function(
   }
 
   get.libraries(c("raster","GWmodel","caret","stringr","ranger","zoo","ggplot2",
-                  "rgeos","scales","doParallel","NbClust","spgwr","NbClust",
+                  "rgeos","scales","doParallel","NbClust","spgwr",
                   "parallel","plyr","spdep","reshape","rgdal","mclust","gtools"))
 
   ##### DEBUGGING #####
@@ -99,8 +97,8 @@ GWRFC <- function(
     return(x)
   }
   corrupted.cases <- function(){
-    cell.names <- c(cell.vars,"BEST","DEP","PRED","ACC","KAPPA")
-    cell.out <- as.data.frame(matrix(nrow=1,ncol=length(cell.vars)+5))
+    cell.names <- c(cell.vars,"BEST","DEP","PRED","PROB","FAIL","KAPPA","BW")
+    cell.out <- as.data.frame(matrix(nrow=1,ncol=length(cell.vars)+7))
     names(cell.out) <- cell.names
     cell.out$DEP <- as.character(cell.i[,1])
     return(cell.out)
@@ -120,7 +118,7 @@ GWRFC <- function(
       cell.data <- cell.data[order(cell.data$dist)[1:kernel.expand],]
       num.classes <- length(unique(cell.data[,1]))
     }
-    return(cell.data)
+    return(list(cell.data,kernel.expand))
   }
   apply.fixed <- function(){
     #first run
@@ -137,48 +135,20 @@ GWRFC <- function(
       cell.data <- cell.data[cell.data$dist < kernel.expand,]
       num.classes <- length(unique(cell.data[,1]))
     }
-    return(cell.data)
+    return(list(cell.data,kernel.expand))
   }
-  radar.plot <- function(){
-    #fix polar coord
-    cp <- coord_polar(theta = "y")
-    cp$is_free <- function() TRUE
-    #plot
-    p <- ggplot(gwc.report, aes(x=value,y=variable,
-                                linetype=clusters,
-                                group=clusters,
-                                color=clusters)) +
-      theme_bw() +
-      theme(plot.title = element_text(size = 15),
-            #panel
-            panel.grid.major = element_line(size = 0.5, linetype = 'dotted',colour = "black"),
-            #legend
-            legend.title=element_text(size=15),
-            legend.text=element_text(size=15),
-            legend.key = element_rect(colour = "black"),
-            legend.position="bottom",
-            #axis x
-            axis.title.x=element_text(size=15),
-            axis.text.x=element_text(hjust = 1,size=15),
-            #axis y
-            axis.title.y=element_text(size=15),
-            axis.text.y=element_text(hjust = 1,size=15),
-            strip.text.y=element_text(size=15),
-            #facet titles off
-            strip.background = element_blank(),
-            strip.text.x = element_blank(),
-            #margins
-            plot.margin=unit(c(0,0,0,0),"cm")) +
-      #legend columns
-      guides(col = guide_legend(nrow=2,byrow=T)) +
-      guides(fill = "none",linetype="none") +
-      #shapes
-      geom_polygon(fill=NA,size=0.8) +
-      #other
-      #scale_linetype_manual("",values=c("solid","dashed")) +
-      labs(y="Variables",x="Average importance [%]") +
-      cp
-    return(p)
+  get.probs <- function(){
+    x <- as.data.frame(predict(cell.rf,cell.i[,2:(ncol(cell.i)-1)])$predictions)
+    x.pred <- names(x[,which.max(x),drop=F])
+    x.prob <- x[,grep(cell.out$DEP,names(x))]
+    return(list(x.pred,x.prob))
+  }
+  get.kappa <- function(){
+    predictions <- factor(apply(cell.rf$predictions,1,function(x){
+      x <- names(x)[which.max(x)]
+    }),levels=levels(cell.data[,1]))
+    conf.m <- caret::confusionMatrix(table(cell.data[,1],predictions))
+    return(conf.m$overall[2])
   }
 
   #### GW RANDOM FOREST ####
@@ -192,8 +162,12 @@ GWRFC <- function(
     #subset by kernel_bandwidth
     if(kernel_adaptative){
       cell.data <- apply.adaptative()
+      ker.bw <- cell.data[[2]]
+      cell.data <- cell.data[[1]]
     }else{
       cell.data <- apply.fixed()
+      ker.bw <- cell.data[[2]]
+      cell.data <- cell.data[[1]]
     }
     #get 'i' observation + drop unused levels
     cell.i <- cell.data[1,]
@@ -223,6 +197,7 @@ GWRFC <- function(
                         min.node.size=1,
                         scale.permutation.importance=T,
                         case.weights=cell.weights,
+                        probability=T,
                         importance="permutation")
       #extract important variables
       cell.best <- names(cell.rf$variable.importance)[cell.rf$variable.importance > 0]
@@ -239,9 +214,10 @@ GWRFC <- function(
                             min.node.size=1,
                             scale.permutation.importance=T,
                             case.weights=cell.weights,
+                            probability=T,
                             importance="permutation")
         }
-        #extract importance + set 0 to negative
+        #extract importance
         cell.out <- data.frame(t(matrix(cell.rf$variable.importance)))
         names(cell.out) <- names(cell.rf$variable.importance)
         cell.out[,cell.out < 0] <- 0
@@ -254,16 +230,17 @@ GWRFC <- function(
         }
         cell.out <- cell.out[sort(names(cell.out))]
         #get three best variables
-        cell.out$BEST <- paste(head(names(cell.out[order(cell.out,decreasing=T)]),3),collapse="+")
-        #get prediction
+        cell.out$BEST <- head(names(cell.out[order(cell.out,decreasing=T)]),3)[1]
+        #get dependent
         cell.out$DEP <- as.character(cell.i[,1])
-        cell.out$PRED <- as.character(predict(cell.rf,cell.i[,2:(ncol(cell.i)-1)])$predictions)
-        #get confusion matrix metrics
-        if(any(is.na(colnames(cell.rf$confusion.matrix)))){
-          cell.rf$confusion.matrix <- cell.rf$confusion.matrix[,!is.na(colnames(cell.rf$confusion.matrix))]
-        }
-        cell.out$ACC <- caret::confusionMatrix(cell.rf$confusion.matrix)$overall[1]
-        cell.out$KAPPA <- caret::confusionMatrix(cell.rf$confusion.matrix)$overall[2]
+        #get prediction + probabilities
+        cell.out$PRED <- get.probs()[[1]]
+        cell.out$PROB <- get.probs()[[2]]
+        #get accuracies metrics
+        cell.out$FAIL <- ifelse(cell.out$DEP!=cell.out$PRED,"yes","no")
+        cell.out$KAPPA <- get.kappa()
+        #get bandwidth applied
+        cell.out$BW <- ker.bw
       }
     }
     #status text
@@ -273,44 +250,8 @@ GWRFC <- function(
     return(cell.out)
   }
   stopCluster(cl)
-  #extract data results
+  #extract data results + reoder
   gwc.data <- do.call("rbind.data.frame",gwc.extract)
-
-  #### CLUSTERING ####
-
-  print("Start clustering...")
-
-  #get variables & NA not for use in clustering
-  index.acc <- (length(gwc.data) - 4):length(gwc.data)
-  index.na <- complete.cases(gwc.data)
-  #get recommended clusters
-  if(clusters_LVI=="auto"){
-    gwc.clus <- gwc.data[index.na,1:(index.acc[1]-1)]
-    clusters_LVI <- NbClust(gwc.clus,
-                            distance = "euclidean",
-                            method="kmeans",
-                            index="gap")$Best.nc[1]
-    gwc.clus <- Mclust(gwc.clus, G=clusters_LVI)
-    gwc.data$CLUSTER <- NA
-    gwc.data[index.na,]$CLUSTER <- gwc.clus$classification
-  }else{
-    #based in specific number of clusters
-    gwc.clus <- gwc.data[index.na,1:(index.acc[1]-1)]
-    gwc.clus <- Mclust(gwc.clus, G=clusters_LVI)
-    gwc.data$CLUSTER <- NA
-    gwc.data[index.na,]$CLUSTER <- gwc.clus$classification
-  }
-
-  #### CREATE REPORT ####
-
-  print("Start report...")
-
-  #from cluster means
-  gwc.report <- as.data.frame(t(gwc.clus$parameters$mean))
-  gwc.report$clusters <- paste0("CLUS_",1:clusters_LVI)
-  gwc.report <- melt(gwc.report,id.vars = "clusters")
-  output.name <- paste0(output_folder,"/clusters_VarImp.jpg")
-  ggsave(filename=output.name,radar.plot(),dpi = 300, width=32,height=32,units="cm")
 
   #### SAVE SHAPEFILE ####
 
@@ -323,11 +264,9 @@ GWRFC <- function(
                         kernel_bandwidth,"_",
                         kernel_type,".shp")
   shapefile(model.shp,output.name,overwrite=T)
-  #warning
+  #error warning
   if(length(which(is.na(model.shp@data$PRED)))!=0){
-    warning(paste0("kernel_bandwidth to short for some iterations and ",
-                   length(which(is.na(model.shp@data$PRED))),
-                   " observations were not possible to evaluate."))
+    warning(paste0(length(which(is.na(model.shp@data$PRED)))," observations were not possible to evaluate during Random Forest execution."))
   }
   #end
   print(paste0("check file: ",basename(output.name)))

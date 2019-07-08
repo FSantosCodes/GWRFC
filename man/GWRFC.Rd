@@ -6,10 +6,10 @@
 \usage{
 GWRFC(input_shapefile, remove_columns = NA, dependent_varName,
   kernel_type = "exponential", kernel_adaptative = T, kernel_bandwidth,
-  clusters_LVI = "auto", number_cores = 1, output_folder)
+  number_cores = 1, output_folder)
 }
 \arguments{
-\item{input_shapefile}{spatialpolygonsdataframe. Input shapefile with dependent and independent variables}
+\item{input_shapefile}{string. Input shapefile with dependent and independent variables. It can be polygons or points based.}
 
 \item{remove_columns}{string. Remove specific variables from 'input_shapefile'. Variables are identified by column name. NA ignores column remove.}
 
@@ -21,11 +21,9 @@ GWRFC(input_shapefile, remove_columns = NA, dependent_varName,
 
 \item{kernel_bandwidth}{numeric. Defines kernel bandwidth. If 'kernel_adaptative' is TRUE, define the number of local observations in the kernel, otherwise define its distance.}
 
-\item{clusters_LVI}{numeric. Number of clusters for summarize local variables importance (LVI). If it is defined as 'auto' (default), it is calculated via Nbclust package.}
+\item{number_cores}{numeric. Number of cores for parallel processing. Cores are register and operated via doParallel, foreach and parallel packages. Be careful with increasing numbers of cores, as RAM memory may be not enough.}
 
-\item{number_cores}{numeric. Number of cores for parallel processing. Cores are register and operated via doParallel, foreach and parallel packages.}
-
-\item{output_folder}{string. Output folder where GWRFC results are stored.}
+\item{output_folder}{string. Output folder where GWRFC outputs will be stored.}
 }
 \description{
 CHECK...
