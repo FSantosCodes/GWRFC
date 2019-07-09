@@ -4,7 +4,7 @@
 #'@param input_GWRFC string. Input shapefile of GWRFC outputs.
 #'@param method_hc string. A method to uso for hierarchical clustering with hclust. It can be: "ward.D", "ward.D2","single","complete","average","mcquitty","median","centroid"
 #'@param num_clusters numeric. Number of clusters for summarize local variables importance (LVI). If it is defined as 'auto' (default), it is calculated via Calinski-Harabasz Index and the second peak from 2,3,4...20 cluster computations. If numeric, it cannot be less than 2.
-#'@param plots logical. If true, plots and reports are created.
+#'@param plots logical. If true, plots and summary reports for each cluster are created.
 #'@param output_folder string. Output folder where GWRFC outputs will be stored.
 #'@export
 
@@ -28,7 +28,7 @@ LVIclust <- function(
   }
 
   get.libraries(c("raster","stringr","zoo","ggplot2","factoextra","FactoMineR",
-                  "rgeos","scales","NbClust","plyr","reshape","fpc",
+                  "rgeos","scales","NbClust","plyr","reshape","fpc","pracma",
                   "rgdal","mclust","gtools","foreign"))
 
   ##### DEBUGGING #####
@@ -183,6 +183,8 @@ LVIclust <- function(
 
   if(plots){
 
+    print("Making plots and reports...")
+
     #add data to RAW
     raw.data$DEP <- factor(gwrfc.dep$DEP)
     raw.data$CLUSTER <- NA
@@ -252,6 +254,7 @@ LVIclust <- function(
                         DEPENDENT=dep.report)
     output.name <- paste0(output_folder,"/LVI_",num_clusters,"clus_report.rds")
     saveRDS(report.data,output.name)
+    return(report.data)
   }
 
   print("****LVIclust end sucessfully*****")
