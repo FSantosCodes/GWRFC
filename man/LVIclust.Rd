@@ -16,7 +16,7 @@ LVIclust(input_shapefile, input_GWRFC, method_hc = "ward.D2",
 
 \item{num_clusters}{numeric. Number of clusters for summarize local variables importance (LVI). If it is defined as 'auto' (default), it is calculated via Calinski-Harabasz Index and the second peak from 2,3,4...20 cluster computations. If numeric, it cannot be less than 2.}
 
-\item{plots}{logical. If true, plots and reports are created.}
+\item{plots}{logical. If true, plots and summary reports for each cluster are created.}
 
 \item{output_folder}{string. Output folder where GWRFC outputs will be stored.}
 }

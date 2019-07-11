@@ -27,7 +27,7 @@ LVIclust <- function(
     }
   }
 
-  get.libraries(c("raster","stringr","zoo","ggplot2","factoextra","FactoMineR",
+  get.libraries(c("raster","stringr","zoo","ggplot2",
                   "rgeos","scales","NbClust","plyr","reshape","fpc","pracma",
                   "rgdal","mclust","gtools","foreign"))
 
@@ -162,17 +162,14 @@ LVIclust <- function(
   gwrfc.clus <- hclust(dist(gwrfc.shp@data[gwrfc.na,]), method = method_hc)
   #get recommended clusters
   if(num_clusters=="auto"){
-    ch.vals <- list()
-    for(i in 2:20){
-      ch.vals[[i]] <- calinhara(gwrfc.shp@data[gwrfc.na,],cutree(gwrfc.clus, k = i))
-    }
-    num.clus <- findpeaks(unlist(ch.vals), npeaks=1)[,2]
-  }else{
-    num.clus <- num_clusters
+    num_clusters <- NbClust(gwc.clus,
+                        distance = "euclidean",
+                        method=method_hc,
+                        index="gap")$Best.nc[1]
   }
   #add data to LVI
   gwrfc.shp@data$CLUSTER <- NA
-  gwrfc.shp@data[gwrfc.na,]$CLUSTER <- cutree(gwrfc.clus, k = num.clus)
+  gwrfc.shp@data[gwrfc.na,]$CLUSTER <- cutree(gwrfc.clus, k = num_clusters)
   lvi.data <- gwrfc.shp@data
   lvi.data <- lvi.data[gwrfc.na,]
   lvi.data$CLUSTER <- factor(lvi.data$CLUSTER)
