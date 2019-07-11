@@ -1,11 +1,32 @@
 Package: GWRFC
 Title: Geographycally Weighted Random Forest Classification (GWRFC)
 Description: later
-Version: 0.1.0
+Version: 0.1
 Author: Fabian Santos [aut, cre]
 Maintainer: Fabian Santos <fabian_santos_@hotmail.com>
 License: GPL-3
 URL: https://github.com/FSantosCodes
+Imports:
+  caret,
+  doParallel,
+  foreign,
+  fpc,
+  ggplot2,
+  gtools,
+  GWmodel,
+  parallel,
+  plyr,
+  pracma,
+  ranger,
+  raster,
+  reshape,
+  rgdal,
+  rgeos,
+  scales,
+  spdep,
+  spgwr,
+  stringr,
+  zoo
 Packaged: 2019-01-07
 Repository: GitHub
 Publication: 2019-01-07

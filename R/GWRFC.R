@@ -39,7 +39,7 @@ GWRFC <- function(
 
   debug <- F
   if(debug){
-    input_shapefile = "C:/DATA/poli/GWRFC/shp/Puntos_2001.shp"
+    input_shapefile = "C:/DATA/poli/GWRFC/shp/Puntos_Final3.shp"
     remove_columns = NA
     dependent_varName = "Class"
     kernel_type = "exponential"
@@ -47,7 +47,7 @@ GWRFC <- function(
     kernel_bandwidth = 50
     clusters_LVI = "auto"
     number_cores = 3
-    output_folder = "C:/DATA/poli/GWRFC/corrida/3_test"
+    output_folder = "C:/DATA/poli/GWRFC/corrida/6_bug"
   }
 
   ##### PREPARE DATA #####
@@ -108,15 +108,15 @@ GWRFC <- function(
     cell.data <- model.shp@data
     cell.data$dist <- dmat[i,]
     cell.data <- cell.data[order(cell.data$dist)[1:kernel_bandwidth],]
-    num.classes <- length(unique(cell.data[,1]))
+    num.classes <- table(cell.data[,1])
     #expand kernel
     kernel.expand <- kernel_bandwidth
-    while(num.classes==1){
+    while(any(num.classes<=4)){
       cell.data <- model.shp@data
       cell.data$dist <- dmat[i,]
       kernel.expand <- kernel.expand + (kernel_bandwidth/10)
       cell.data <- cell.data[order(cell.data$dist)[1:kernel.expand],]
-      num.classes <- length(unique(cell.data[,1]))
+      num.classes <- table(cell.data[,1])
     }
     return(list(cell.data,kernel.expand))
   }
@@ -125,15 +125,15 @@ GWRFC <- function(
     cell.data <- model.shp@data
     cell.data$dist <- dmat[i,]
     cell.data <- cell.data[cell.data$dist < kernel_bandwidth,]
-    num.classes <- length(unique(cell.data[,1]))
+    num.classes <- table(cell.data[,1])
     #expand kernel
     kernel.expand <- kernel_bandwidth
-    while(num.classes==1){
+    while(any(num.classes<=4)){
       cell.data <- model.shp@data
       cell.data$dist <- dmat[i,]
       kernel.expand <- kernel.expand + (kernel_bandwidth/10)
       cell.data <- cell.data[cell.data$dist < kernel.expand,]
-      num.classes <- length(unique(cell.data[,1]))
+      num.classes <- table(cell.data[,1])
     }
     return(list(cell.data,kernel.expand))
   }
