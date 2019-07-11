@@ -37,7 +37,7 @@ LVIclust <- function(
   if(debug){
     input_shapefile = "C:/DATA/poli/GWRFC/shp/Puntos_2001.shp"
     input_GWRFC = "C:/DATA/poli/GWRFC/corrida/3_test/GWRFC_ADP_100_exponential.shp"
-    num_clusters = 4
+    num_clusters = "auto"
     plots=T
     output_folder = "C:/DATA/poli/GWRFC/corrida/3_test"
   }
@@ -166,11 +166,13 @@ LVIclust <- function(
     for(i in 2:20){
       ch.vals[[i]] <- calinhara(gwrfc.shp@data[gwrfc.na,],cutree(gwrfc.clus, k = i))
     }
-    num_clusters <- findpeaks(unlist(ch.vals), npeaks=1)[,2]
+    num.clus <- findpeaks(unlist(ch.vals), npeaks=1)[,2]
+  }else{
+    num.clus <- num_clusters
   }
   #add data to LVI
   gwrfc.shp@data$CLUSTER <- NA
-  gwrfc.shp@data[gwrfc.na,]$CLUSTER <- cutree(gwrfc.clus, k = num_clusters)
+  gwrfc.shp@data[gwrfc.na,]$CLUSTER <- cutree(gwrfc.clus, k = num.clus)
   lvi.data <- gwrfc.shp@data
   lvi.data <- lvi.data[gwrfc.na,]
   lvi.data$CLUSTER <- factor(lvi.data$CLUSTER)
