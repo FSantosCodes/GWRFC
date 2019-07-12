@@ -29,7 +29,7 @@ LVIclust <- function(
 
   get.libraries(c("raster","stringr","zoo","ggplot2",
                   "rgeos","scales","NbClust","plyr","reshape","fpc","pracma",
-                  "rgdal","mclust","gtools","foreign"))
+                  "rgdal","gtools","foreign"))
 
   ##### DEBUGGING #####
 
@@ -162,10 +162,10 @@ LVIclust <- function(
   gwrfc.clus <- hclust(dist(gwrfc.shp@data[gwrfc.na,]), method = method_hc)
   #get recommended clusters
   if(num_clusters=="auto"){
-    num_clusters <- NbClust(gwc.clus,
-                        distance = "euclidean",
-                        method=method_hc,
-                        index="gap")$Best.nc[1]
+    num_clusters <- NbClust(gwrfc.shp@data[gwrfc.na,],
+                            distance = "euclidean",
+                            method=method_hc,
+                            index="gap")$Best.nc[1]
   }
   #add data to LVI
   gwrfc.shp@data$CLUSTER <- NA
