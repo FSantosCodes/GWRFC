@@ -27,9 +27,8 @@ LVIclust <- function(
     }
   }
 
-  get.libraries(c("raster","stringr","zoo","ggplot2",
-                  "rgeos","scales","NbClust","plyr","reshape","fpc","pracma",
-                  "rgdal","gtools","foreign"))
+  get.libraries(c("raster","stringr","zoo","ggplot2","rgeos","scales",
+                  "plyr","reshape","fpc","pracma","rgdal","gtools","foreign"))
 
   ##### DEBUGGING #####
 
@@ -39,6 +38,7 @@ LVIclust <- function(
     input_GWRFC = "C:/DATA/poli/GWRFC/corrida/3_test/GWRFC_ADP_100_exponential.shp"
     num_clusters = "auto"
     plots=T
+    method_hc="ward.D2"
     output_folder = "C:/DATA/poli/GWRFC/corrida/3_test"
   }
 
@@ -154,6 +154,13 @@ LVIclust <- function(
     return(x.agr)
   }
 
+  get.elbow <- function(x, y, threshold) {
+    d1 <- diff(y) / diff(x) # first derivative
+    d2 <- diff(d1) / diff(x[-1]) # second derivative
+    indices <- which(abs(d2) > threshold)
+    return(indices)
+  }
+
   #### CLUSTERING ####
 
   print("Start clustering...")
@@ -162,10 +169,11 @@ LVIclust <- function(
   gwrfc.clus <- hclust(dist(gwrfc.shp@data[gwrfc.na,]), method = method_hc)
   #get recommended clusters
   if(num_clusters=="auto"){
-    num_clusters <- NbClust(gwrfc.shp@data[gwrfc.na,],
-                            distance = "euclidean",
-                            method=method_hc,
-                            index="gap")$Best.nc[1]
+    cal.vals <- list()
+    for(i in 2:20){
+      cal.vals[[i]] <- calinhara(gwrfc.shp@data[gwrfc.na,],cutree(gwrfc.clus, k = i))
+    }
+    num_clusters <- get.elbow(unlist(cal.vals),1:19,2)[1]
   }
   #add data to LVI
   gwrfc.shp@data$CLUSTER <- NA
