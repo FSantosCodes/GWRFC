@@ -312,9 +312,9 @@ LVIclust <- function(
   output.name <- paste0(output_folder,"/",clus_data,"_",clus_num,"clus_report.rds")
   saveRDS(report.data,output.name)
   return(report.data)
-
+  print("****LVIclust end sucessfully*****")
 }
 
-print("****LVIclust end sucessfully*****")
+
 
 

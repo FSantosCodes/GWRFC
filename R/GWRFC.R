@@ -2,7 +2,7 @@
 #'@description CHECK...
 #'@param input_shapefile string or Spatial-class. Input shapefile with dependent and independent variables.  It can be the filename of the shapefile or an object of class SpatialPolygonsDataFrame or SpatialPointsDataFrame.
 #'@param remove_columns string. Remove specific variables from input_shapefile. Variables are identified by column name. NA ignores column remove.
-#'@param dependent_varName string. Dependent variable name. Must exists at input_shapefile.
+#'@param dependent_varName string. Dependent variable name. Must exists at input_shapefile and should be categorical (with not more than 20 classes).
 #'@param kernel_type string. Kernel type to apply in GWRFC. It can be: 'gaussian', 'exponential', 'bisquare' or 'tricube'.
 #'@param kernel_adaptative logical. Is the kernel adaptative? otherwise it is considered as fixed.
 #'@param kernel_bandwidth numeric. Defines kernel bandwidth. If kernel_adaptative is TRUE, then you should define the number of local observations in the kernel, otherwise define you should define a distance to specify kernel bandwidth.
@@ -39,15 +39,14 @@ GWRFC <- function(
 
   debug <- F
   if(debug){
-    input_shapefile = "C:/DATA/poli/GWRFC/shp/Puntos_2001.shp"
-    remove_columns = NA
-    dependent_varName = "Class"
+    input_shapefile = "C:/DATA/demo/deforestacion/def_consolidated.shp"
+    remove_columns = c("ID_grid")
+    dependent_varName = "fao"
     kernel_type = "exponential"
     kernel_adaptative = T
-    kernel_bandwidth = 50
-    clusters_LVI = "auto"
+    kernel_bandwidth = 400
     number_cores = 3
-    output_folder = "C:/DATA/poli/GWRFC/corrida/6_bug"
+    output_folder = "C:/DATA/demo/deforestacion/resultados"
   }
 
   ##### PREPARE DATA #####
@@ -78,7 +77,10 @@ GWRFC <- function(
   #get dependent/independent columns
   model.dep <- grep(dependent_varName,names(model.shp))
   if(length(dependent_varName)==0){
-    stop("'dependent_varName' not found")
+    stop("dependent_varName not found")
+  }else if(length(unique(model.shp@data[,model.dep]))>=21){
+    stop(paste0("dependent_varName has ",length(unique(model.shp@data[,model.dep])),
+                " classes. Consider to reduce it into 20 classes"))
   }
   model.ind <- names(model.shp)[!grepl(dependent_varName,names(model.shp))]
   model.ind <- grep(paste(model.ind,collapse="|"),names(model.shp))
