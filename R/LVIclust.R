@@ -39,7 +39,7 @@ LVIclust <- function(
     input_shapefile = shapefile("C:/DATA/demo/incendios/Puntos_2001.shp")
     input_GWRFC = shapefile("C:/DATA/demo/incendios/resultados/GWRFC_ADP_300_exponential.shp")
     clus_data="LVI"
-    clus_num="auto"
+    clus_num=10
     plots=T
     method_hc="ward.D2"
     output_folder = "C:/DATA/demo/incendios/resultados"
@@ -84,16 +84,13 @@ LVIclust <- function(
 
   #### FUNCTIONS ####
 
-  radar.lvi <- function(x){
-    #fix polar coord
-    cp <- coord_polar(theta = "y")
-    cp$is_free <- function() TRUE
+  bar.lvi <- function(x){
     #plot
-    p <- ggplot(x, aes(x=value,y=variable,
+    p <- ggplot(x, aes(x=reorder(variable, value),y=value,
                        group=CLUSTER,
                        fill=CLUSTER)) +
       theme_bw() +
-      theme(plot.title = element_text(size = 15),
+      theme(plot.title = element_text(size = 20),
             #panel
             panel.grid.major = element_line(size = 0.5, linetype = 'dotted',colour = "black"),
             #legend
@@ -104,6 +101,7 @@ LVIclust <- function(
             #axis x
             axis.title.x=element_text(size=15),
             axis.text.x=element_text(hjust = 1,size=15),
+            #strip.text.x=element_text(size=15),
             #axis y
             axis.title.y=element_text(size=15),
             axis.text.y=element_text(hjust = 1,size=15),
@@ -114,42 +112,47 @@ LVIclust <- function(
             #margins
             plot.margin=unit(c(0,0,0,0),"cm")) +
       #legend columns
-      guides(col = guide_legend(nrow=2,byrow=T)) +
-      guides(fill = "none",linetype="none") +
+      guides(col = guide_legend(nrow=1,byrow=T)) +
       #shapes
-      geom_polygon(size=0.5) +
+      geom_col(position = "dodge") +
       #other
-      labs(y="Variables",x="Average importance [%]") +
-      cp +
+      labs(title="Average importance of independent variables, grouped by clusters",x="Variables",y="Average importance (%)") +
+      coord_flip() +
       facet_wrap(~CLUSTER)
     return(p)
   }
 
-  boxplot.raw <- function(x,y_range=c(-5,5)){
+  boxplot.raw <- function(x,y_range=c(-3,3)){
     p <- ggplot(x,aes(x=reorder(variable,value), y=value,
-                      color=CLUSTER,
+                      fill=CLUSTER,
                       group=interaction(variable,CLUSTER))) +
       theme_bw() +
-      theme(plot.title = element_text(size = 15),
+      theme(plot.title = element_text(size = 20),
+            #legend
             legend.title=element_text(size=15),
             legend.text=element_text(size=15),
             legend.key = element_rect(colour = "black"),
             legend.position="bottom",
+            #x axis
             axis.title.x=element_text(size=15),
             axis.text.x=element_text(hjust = 1,size=15,angle=45),
             strip.text.x = element_blank(),
+            #y axis
             axis.title.y=element_text(size=15),
             axis.text.y=element_text(hjust = 1,size=15),
             strip.text.y=element_text(size=15),
-            strip.background = element_blank(),
-            panel.grid.minor = element_blank()) +
+            #facet titles off
+            #strip.background = element_blank(),
+            #panel.grid.minor = element_blank()) +
+            #margins
+            plot.margin=unit(c(0,0,0,0),"cm")) +
       #boxplot geom
-      geom_boxplot(position=position_dodge(width = 0.75),
+      geom_boxplot(position=position_dodge(width = 0.75),outlier.alpha=0.33,
                    show.legend = T) +
       #others
       geom_hline(yintercept=0,linetype="dotted",color="black",size=0.75) +
       coord_cartesian(ylim=y_range) +
-      labs(x="Variables",y="Z-scores")
+      labs(title="Standarized values of quantitative independent variables, grouped by clusters",x="Variables (Mean ± SD)",y="Z-scores")
     return(p)
   }
 
@@ -240,8 +243,8 @@ LVIclust <- function(
   #radar plot
   if(plots){
     lvi.plot <- melt(lvi.data,id.vars="CLUSTER")
-    lvi.plot <- radar.lvi(lvi.plot)
-    output.name <- paste0(output_folder,"/",clus_data,"_",clus_num,"clus_radarPlot.jpg")
+    lvi.plot <- bar.lvi(lvi.plot)
+    output.name <- paste0(output_folder,"/",clus_data,"_",clus_num,"clus_barPlot.jpg")
     ggsave(filename=output.name,lvi.plot,dpi = 300, width=10*clus_num,height=10*clus_num,units="cm")
   }
 
@@ -265,12 +268,14 @@ LVIclust <- function(
   if(plots){
     scale.vals <- scale(quanti.df[,1:(ncol(quanti.df)-1)])
     quanti.df[,1:(ncol(quanti.df)-1)] <- scale.vals
-    scale.vals <- paste0(names(quanti.df)[1:(ncol(quanti.df)-1)],":",round(attr(scale.vals,"scaled:scale"),2))
+    scale.vals <- paste0(names(quanti.df)[1:(ncol(quanti.df)-1)],"\n","(",
+                         round(attr(scale.vals,"scaled:center"),2)," ± ",
+                         round(attr(scale.vals,"scaled:scale"),2),")")
     names(quanti.df)[1:(ncol(quanti.df)-1)] <- scale.vals
     quanti.plot <- melt(quanti.df,id.vars="CLUSTER")
     quanti.plot <- boxplot.raw(quanti.plot)
-    output.name <- paste0(output_folder,"/",clus_data,"_",clus_num,"clus_boxplot.jpg")
-    ggsave(filename=output.name,quanti.plot,dpi = 300, width=10*clus_num,height=20,units="cm")
+    output.name <- paste0(output_folder,"/",clus_data,"_",clus_num,"clus_boxPlot.jpg")
+    ggsave(filename=output.name,quanti.plot,dpi = 300, width=10*clus_num,height=30,units="cm")
   }
 
   #### ACCURACY REPORT ####
