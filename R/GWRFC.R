@@ -1,11 +1,11 @@
 #'@title Geographically weighted Random Forest Classification (GWRFC)
 #'@description CHECK...
-#'@param input_shapefile string. Input shapefile with dependent and independent variables. It can be polygons or points based.
-#'@param remove_columns string. Remove specific variables from 'input_shapefile'. Variables are identified by column name. NA ignores column remove.
-#'@param dependent_varName string. Dependent variable name. Must exists at 'input_shapefile'.
+#'@param input_shapefile string or Spatial-class. Input shapefile with dependent and independent variables.  It can be the filename of the shapefile or an object of class SpatialPolygonsDataFrame or SpatialPointsDataFrame.
+#'@param remove_columns string. Remove specific variables from input_shapefile. Variables are identified by column name. NA ignores column remove.
+#'@param dependent_varName string. Dependent variable name. Must exists at input_shapefile.
 #'@param kernel_type string. Kernel type to apply in GWRFC. It can be: 'gaussian', 'exponential', 'bisquare' or 'tricube'.
 #'@param kernel_adaptative logical. Is the kernel adaptative? otherwise it is considered as fixed.
-#'@param kernel_bandwidth numeric. Defines kernel bandwidth. If 'kernel_adaptative' is TRUE, define the number of local observations in the kernel, otherwise define its distance.
+#'@param kernel_bandwidth numeric. Defines kernel bandwidth. If kernel_adaptative is TRUE, then you should define the number of local observations in the kernel, otherwise define you should define a distance to specify kernel bandwidth.
 #'@param number_cores numeric. Number of cores for parallel processing. Cores are register and operated via doParallel, foreach and parallel packages. Be careful with increasing numbers of cores, as RAM memory may be not enough.
 #'@param output_folder string. Output folder where GWRFC outputs will be stored.
 #'@export
@@ -32,14 +32,14 @@ GWRFC <- function(
   }
 
   get.libraries(c("raster","GWmodel","caret","stringr","ranger","zoo","ggplot2",
-                  "rgeos","scales","doParallel","NbClust","spgwr",
-                  "parallel","plyr","spdep","reshape","rgdal","mclust","gtools"))
+                  "rgeos","scales","doParallel","spgwr","parallel","plyr",
+                  "spdep","reshape","rgdal","gtools"))
 
   ##### DEBUGGING #####
 
   debug <- F
   if(debug){
-    input_shapefile = "C:/DATA/poli/GWRFC/shp/Puntos_Final3.shp"
+    input_shapefile = "C:/DATA/poli/GWRFC/shp/Puntos_2001.shp"
     remove_columns = NA
     dependent_varName = "Class"
     kernel_type = "exponential"
@@ -62,7 +62,11 @@ GWRFC <- function(
     unlink(paste0(output_folder,"/progress.txt"),recursive = T, force = T)
   }
   #read shp
-  model.shp <- shapefile(input_shapefile)
+  if(class(input_shapefile)=="SpatialPolygonsDataFrame"|class(input_shapefile)=="SpatialPointsDataFrame"){
+    model.shp <- input_shapefile
+  }else{
+    model.shp <- shapefile(input_shapefile)
+  }
   #remove columns?
   if(!is.na(remove_columns)[1]){
     if(length(grep(paste(remove_columns,collapse="|"),names(model.shp))) != 0){
@@ -97,10 +101,11 @@ GWRFC <- function(
     return(x)
   }
   corrupted.cases <- function(){
-    cell.names <- c(cell.vars,"BEST","DEP","PRED","PROB","FAIL","KAPPA","BW")
-    cell.out <- as.data.frame(matrix(nrow=1,ncol=length(cell.vars)+7))
+    cell.names <- sort(names(model.shp@data[,2:ncol(model.shp@data)]))
+    probs.class <- paste0("P_",levels(model.shp@data[,1]))
+    cell.names <- c(cell.names,"BEST","DEP","PRED",probs.class,"FAIL","KAPPA","BW")
+    cell.out <- as.data.frame(matrix(nrow=1,ncol=length(cell.names)))
     names(cell.out) <- cell.names
-    cell.out$DEP <- as.character(cell.i[,1])
     return(cell.out)
   }
   apply.adaptative <- function(){
@@ -143,6 +148,11 @@ GWRFC <- function(
     x.prob <- x[,grep(cell.out$DEP,names(x))]
     return(list(x.pred,x.prob))
   }
+  get.probsClass <- function(){
+    x <- as.data.frame(predict(cell.rf,cell.i[,2:(ncol(cell.i)-1)])$predictions)
+    x.pred <- names(x[,which.max(x),drop=F])
+    return(list(x.pred,x))
+  }
   get.kappa <- function(){
     predictions <- factor(apply(cell.rf$predictions,1,function(x){
       x <- names(x)[which.max(x)]
@@ -169,13 +179,14 @@ GWRFC <- function(
       ker.bw <- cell.data[[2]]
       cell.data <- cell.data[[1]]
     }
-    #get 'i' observation + drop unused levels
+    #get 'i' observation
     cell.i <- cell.data[1,]
-    cell.data[,1] <- droplevels(cell.data[,1])
     #CORRUPTED CASE 1: only one observation
     if(nrow(cell.data)==1){
       cell.out <- corrupted.cases()
     }else{
+      #drop unused levels
+      cell.data[,1] <- droplevels(cell.data[,1])
       #balance + set levels in classification
       cell.data <- upSample(cell.data[,2:ncol(cell.data)],cell.data[,1],yname=names(cell.data)[1])
       cell.data <- cell.data[,c(ncol(cell.data),1:ncol(cell.data)-1)]
@@ -233,9 +244,12 @@ GWRFC <- function(
         cell.out$BEST <- head(names(cell.out[order(cell.out,decreasing=T)]),3)[1]
         #get dependent
         cell.out$DEP <- as.character(cell.i[,1])
-        #get prediction + probabilities
-        cell.out$PRED <- get.probs()[[1]]
-        cell.out$PROB <- get.probs()[[2]]
+        #get prediction
+        cell.out$PRED <- get.probsClass()[[1]]
+        #get probabilities
+        cell.out.prob <- get.probsClass()[[2]]
+        names(cell.out.prob) <- paste0("P_", names(cell.out.prob))
+        cell.out <- cbind(cell.out,as.data.frame(cell.out.prob))
         #get accuracies metrics
         cell.out$FAIL <- ifelse(cell.out$DEP!=cell.out$PRED,"yes","no")
         cell.out$KAPPA <- get.kappa()

@@ -5,20 +5,22 @@
 \title{Local variables importance (LVI) clustering from GWRFC outputs}
 \usage{
 LVIclust(input_shapefile, input_GWRFC, method_hc = "ward.D2",
-  num_clusters = "auto", plots = T, output_folder)
+  clus_data = "LVI", clus_num = "auto", plots = T, output_folder)
 }
 \arguments{
-\item{input_shapefile}{string. Input shapefile with dependent and independent variables. It can be polygons or points based.}
+\item{input_shapefile}{string or Spatial-class. Input shapefile with dependent and independent variables. It can be the filename of the shapefile or an object of class SpatialPolygonsDataFrame or SpatialPointsDataFrame.}
 
-\item{input_GWRFC}{string. Input shapefile of GWRFC outputs.}
+\item{input_GWRFC}{string or Spatial-class. Input shapefile of GWRFC outputs. It can be the filename of the shapefile or an object of class SpatialPolygonsDataFrame or SpatialPointsDataFrame.}
 
-\item{method_hc}{string. A method to uso for hierarchical clustering with hclust. It can be: "ward.D", "ward.D2","single","complete","average","mcquitty","median","centroid"}
+\item{method_hc}{string. A method to use for hierarchical clustering with hclust. It can be:"ward.D","ward.D2","single","complete","average","mcquitty","median" or "centroid".}
 
-\item{num_clusters}{numeric. Number of clusters for summarize local variables importance (LVI). If it is defined as 'auto' (default), it is calculated via Calinski-Harabasz Index and the second peak from 2,3,4...20 cluster computations. If numeric, it cannot be less than 2.}
+\item{clus_data}{string. Data which should be used in clustering. It can be "LVI" to refer to all LVI variables or any specific column at input_GWRFC. In this case, hierarchical clustering is not applied and target variable is reclassified into quantiles for report it.}
 
-\item{plots}{logical. If true, plots and summary reports for each cluster are created.}
+\item{clus_num}{numeric or string. If applies hierarchical clustering, then it is the number of clusters; otherwise it is the number of quantiles to use. If it is defined as 'auto' (default), then a number is calculated via Calinski-Harabasz Index in hierarchical clustering or defined in 5 for quantiles.}
 
-\item{output_folder}{string. Output folder where GWRFC outputs will be stored.}
+\item{plots}{logical. If true, plots are added to clusters report.}
+
+\item{output_folder}{string. Output folder where LVIclust outputs will be stored.}
 }
 \description{
 CHECK...

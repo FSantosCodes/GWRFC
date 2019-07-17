@@ -9,17 +9,17 @@ GWRFC(input_shapefile, remove_columns = NA, dependent_varName,
   number_cores = 1, output_folder)
 }
 \arguments{
-\item{input_shapefile}{string. Input shapefile with dependent and independent variables. It can be polygons or points based.}
+\item{input_shapefile}{string or Spatial-class. Input shapefile with dependent and independent variables.  It can be the filename of the shapefile or an object of class SpatialPolygonsDataFrame or SpatialPointsDataFrame.}
 
-\item{remove_columns}{string. Remove specific variables from 'input_shapefile'. Variables are identified by column name. NA ignores column remove.}
+\item{remove_columns}{string. Remove specific variables from input_shapefile. Variables are identified by column name. NA ignores column remove.}
 
-\item{dependent_varName}{string. Dependent variable name. Must exists at 'input_shapefile'.}
+\item{dependent_varName}{string. Dependent variable name. Must exists at input_shapefile.}
 
 \item{kernel_type}{string. Kernel type to apply in GWRFC. It can be: 'gaussian', 'exponential', 'bisquare' or 'tricube'.}
 
 \item{kernel_adaptative}{logical. Is the kernel adaptative? otherwise it is considered as fixed.}
 
-\item{kernel_bandwidth}{numeric. Defines kernel bandwidth. If 'kernel_adaptative' is TRUE, define the number of local observations in the kernel, otherwise define its distance.}
+\item{kernel_bandwidth}{numeric. Defines kernel bandwidth. If kernel_adaptative is TRUE, then you should define the number of local observations in the kernel, otherwise define you should define a distance to specify kernel bandwidth.}
 
 \item{number_cores}{numeric. Number of cores for parallel processing. Cores are register and operated via doParallel, foreach and parallel packages. Be careful with increasing numbers of cores, as RAM memory may be not enough.}
 
