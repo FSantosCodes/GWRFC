@@ -68,6 +68,8 @@ GWRFC <- function(
   }else{
     model.shp <- shapefile(input_shapefile)
   }
+  #assign rownames
+  rownames(model.shp@data) <- 1:length(model.shp)
   #remove columns?
   if(!is.na(remove_columns)[1]){
     if(length(grep(paste(remove_columns,collapse="|"),names(model.shp))) != 0){
@@ -95,8 +97,8 @@ GWRFC <- function(
   #complete cases
   pos.NA <- which(!complete.cases(model.shp@data))
   if(length(pos.NA)!=0){
-    warning(paste0("input_shapefile has ",length(pos.NA)," incomplete case(s). Removing it/them..."))
     model.shp <- model.shp[which(complete.cases(model.shp@data)),]
+    warning(paste0("input_shapefile has ",length(pos.NA)," incomplete case(s). Removing it/them..."))
   }
   #distance matrix
   dmat <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp))
@@ -280,7 +282,8 @@ GWRFC <- function(
   stopCluster(cl)
   #extract data results + reoder
   gwc.data <- do.call("rbind.data.frame",gwc.extract)
-  #gwc.data <- plyr::rbind.fill(gwc.extract)
+  #add original rownames
+  gwc.data$ID_row <- rownames(model.shp@data)
 
   #### SAVE SHAPEFILE ####
 

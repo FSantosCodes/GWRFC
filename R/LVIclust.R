@@ -3,7 +3,7 @@
 #'@param input_shapefile string or Spatial-class. Input shapefile with dependent and independent variables. It can be the filename of the shapefile or an object of class SpatialPolygonsDataFrame or SpatialPointsDataFrame.
 #'@param input_GWRFC string or Spatial-class. Input shapefile of GWRFC outputs. It can be the filename of the shapefile or an object of class SpatialPolygonsDataFrame or SpatialPointsDataFrame.
 #'@param method_hc string. A method to use for hierarchical clustering with hclust. It can be:"ward.D","ward.D2","single","complete","average","mcquitty","median" or "centroid".
-#'@param clus_data string. Data which should be used in clustering. It can be "LVI" to refer to all LVI variables or any specific column at input_GWRFC. In this case, hierarchical clustering is not applied and target variable is reclassified into quantiles for report it.
+#'@param clus_data string. Data which should be used in clustering. It can be "LVI" to refer to all LVI variables or any specific column at input_GWRFC. In this case, hierarchical clustering is not applied and target variable is reclassified into quantiles if it is numerical.
 #'@param clus_num numeric or string. If applies hierarchical clustering, then it is the number of clusters; otherwise it is the number of quantiles to use. If it is defined as 'auto' (default), then a number is calculated via Calinski-Harabasz Index in hierarchical clustering or defined in 5 for quantiles.
 #'@param plots logical. If true, plots are added to clusters report.
 #'@param output_folder string. Output folder where LVIclust outputs will be stored.
@@ -36,13 +36,13 @@ LVIclust <- function(
 
   debug <- F
   if(debug){
-    input_shapefile = shapefile("C:/DATA/demo/incendios/Puntos_2001.shp")
-    input_GWRFC = shapefile("C:/DATA/demo/incendios/resultados/GWRFC_ADP_300_exponential.shp")
-    clus_data="LVI"
-    clus_num=10
+    input_shapefile = shapefile("C:/DATA/demo/educacion/cant_bach.shp")
+    input_GWRFC = shapefile("C:/DATA/demo/educacion/resultados/GWRFC_ADP_50_exponential.shp")
+    clus_data="P_APROB"
+    clus_num="auto"
     plots=T
     method_hc="ward.D2"
-    output_folder = "C:/DATA/demo/incendios/resultados"
+    output_folder = "C:/DATA/demo/educacion/resultados"
   }
 
   ##### PREPARE DATA #####
@@ -56,7 +56,7 @@ LVIclust <- function(
   }
   #folder
   dir.create(output_folder,showWarnings = F, recursive = T)
-  #read GWRFC + extract LVI data
+  #read GWRFC
   if(class(input_GWRFC)=="SpatialPolygonsDataFrame"|class(input_GWRFC)=="SpatialPointsDataFrame"){
     gwrfc.shp <- input_GWRFC
     na.gwrfc <- complete.cases(gwrfc.shp@data)
@@ -66,20 +66,20 @@ LVIclust <- function(
     na.gwrfc <- complete.cases(gwrfc.shp@data)
     gwrfc.shp <- gwrfc.shp[na.gwrfc,]
   }
-  #get other variables not in LVI
+  #read RAW + filter rows
+  if(class(input_shapefile)=="SpatialPolygonsDataFrame"|class(input_shapefile)=="SpatialPointsDataFrame"){
+    raw.data <- input_shapefile@data
+  }else{
+    raw.data <- read.dbf(gsub(".shp$",".dbf",input_shapefile))
+  }
+  rownames(raw.data) <- 1:nrow(raw.data)
+  raw.data <- raw.data[rownames(raw.data) %in% gwrfc.shp@data$ID_row,]
+  gwrfc.shp@data$ID_row <- NULL
+  #get LVI & model results + filter columns in RAW
   target.names <- names(gwrfc.shp@data)[grep("P_",names(gwrfc.shp@data))]
   target.names  <- c("BEST","DEP","PRED",target.names,"FAIL","KAPPA","BW")
   gwrfc.dep <- gwrfc.shp@data[,which(names(gwrfc.shp@data) %in% target.names)]
   gwrfc.shp@data <- gwrfc.shp@data[,which(!names(gwrfc.shp@data) %in% target.names)]
-
-  #read input data + extract variables
-  if(class(input_shapefile)=="SpatialPolygonsDataFrame"|class(input_shapefile)=="SpatialPointsDataFrame"){
-    raw.data <- input_shapefile@data
-    raw.data <- raw.data[na.gwrfc,]
-  }else{
-    raw.data <- read.dbf(gsub(".shp$",".dbf",input_shapefile))
-    raw.data <- raw.data[na.gwrfc,]
-  }
   raw.data <- raw.data[,which(names(raw.data) %in% names(gwrfc.shp@data))]
 
   #### FUNCTIONS ####
@@ -101,7 +101,6 @@ LVIclust <- function(
             #axis x
             axis.title.x=element_text(size=15),
             axis.text.x=element_text(hjust = 1,size=15),
-            #strip.text.x=element_text(size=15),
             #axis y
             axis.title.y=element_text(size=15),
             axis.text.y=element_text(hjust = 1,size=15),
@@ -116,13 +115,16 @@ LVIclust <- function(
       #shapes
       geom_col(position = "dodge") +
       #other
-      labs(title="Average importance of independent variables, grouped by clusters",x="Variables",y="Average importance (%)") +
       coord_flip() +
-      facet_wrap(~CLUSTER)
+      facet_wrap(~CLUSTER) +
+      labs(title="Average importance of independent variables, grouped by clusters",
+           x="Variables",
+           y="Average importance (%)")
+
     return(p)
   }
 
-  boxplot.raw <- function(x,y_range=c(-3,3)){
+  boxplot.quanti <- function(x,y_range=c(-3,3)){
     p <- ggplot(x,aes(x=reorder(variable,value), y=value,
                       fill=CLUSTER,
                       group=interaction(variable,CLUSTER))) +
@@ -136,14 +138,13 @@ LVIclust <- function(
             #x axis
             axis.title.x=element_text(size=15),
             axis.text.x=element_text(hjust = 1,size=15,angle=45),
-            strip.text.x = element_blank(),
             #y axis
             axis.title.y=element_text(size=15),
             axis.text.y=element_text(hjust = 1,size=15),
             strip.text.y=element_text(size=15),
             #facet titles off
-            #strip.background = element_blank(),
-            #panel.grid.minor = element_blank()) +
+            strip.background = element_blank(),
+            strip.text.x = element_blank(),
             #margins
             plot.margin=unit(c(0,0,0,0),"cm")) +
       #boxplot geom
@@ -152,7 +153,40 @@ LVIclust <- function(
       #others
       geom_hline(yintercept=0,linetype="dotted",color="black",size=0.75) +
       coord_cartesian(ylim=y_range) +
-      labs(title="Standarized values of quantitative independent variables, grouped by clusters",x="Variables (Mean ± SD)",y="Z-scores")
+      labs(title="Standarized values for quantitative variables, grouped by clusters",
+           x="Variables (Mean ± SD)",
+           y="Z-scores")
+    return(p)
+  }
+
+  hist.quali <- function(x){
+    p <- ggplot(x,aes(x=value,
+                      fill=CLUSTER)) +
+      theme_bw() +
+      theme(plot.title = element_text(size = 20),
+            #legend
+            legend.title=element_text(size=15),
+            legend.text=element_text(size=15),
+            legend.key = element_rect(colour = "black"),
+            legend.position="bottom",
+            #x axis
+            axis.title.x=element_text(size=15),
+            axis.text.x=element_text(hjust = 1,size=15,angle=45),
+            strip.text.x=element_text(size=15),
+            #y axis
+            axis.title.y=element_text(size=15),
+            axis.text.y=element_text(hjust = 1,size=15),
+            strip.text.y=element_text(size=15),
+            #margins
+            plot.margin=unit(c(0,0,0,0),"cm")) +
+      #bar geom
+      geom_bar(position = "dodge") +
+      #other
+      coord_flip() +
+      facet_wrap(~variable,scales="free",ncol=4) +
+      labs(title="Classes counts for qualitative variables, grouped by clusters",
+           x="Count",
+           y="Classes")
     return(p)
   }
 
@@ -211,11 +245,15 @@ LVIclust <- function(
     gwrfc.shp@data$CLUSTER <- cutree(gwrfc.clus, k = clus_num)
   }else{
     clus_num <- ifelse(clus_num=="auto",5,clus_num)
+    if(length(grep(clus_data,names(gwrfc.dep)))==0){
+      stop("clus_data not found")
+    }
     gwrfc.shp@data$CLUSTER <- gwrfc.dep[,grep(clus_data,names(gwrfc.dep))]
     if(class(gwrfc.shp@data$CLUSTER)!="factor"|class(gwrfc.shp@data$CLUSTER)!="character"){
-      gwrfc.shp@data$CLUSTER <- factor(cut(gwrfc.shp@data$CLUSTER,
-                                           breaks=quantile(gwrfc.shp@data$CLUSTER,probs=seq(0,1,length.out=clus_num)),
-                                           include.lowest=T))
+      gwrfc.shp@data$CLUSTER <- base::cut(gwrfc.shp@data$CLUSTER,
+                                          breaks=quantile(gwrfc.shp@data$CLUSTER,probs=seq(0,1,length.out=clus_num)),
+                                          labels=paste0("Q",floor(seq(0,1,length.out=clus_num)*100))[2:clus_num],
+                                          include.lowest=T)
     }else{
       gwrfc.shp@data$CLUSTER <- factor(gwrfc.shp@data$CLUSTER)
     }
@@ -240,11 +278,11 @@ LVIclust <- function(
   lvi.report$sd <- x.summary(lvi.data,"sd")[,3]
   lvi.report$min <- x.summary(lvi.data,"min")[,3]
   lvi.report$max <- x.summary(lvi.data,"max")[,3]
-  #radar plot
+  #bar plot
   if(plots){
     lvi.plot <- melt(lvi.data,id.vars="CLUSTER")
     lvi.plot <- bar.lvi(lvi.plot)
-    output.name <- paste0(output_folder,"/",clus_data,"_",clus_num,"clus_barPlot.jpg")
+    output.name <- paste0(output_folder,"/",clus_data,"_",clus_num,"clus_LVIPlot.jpg")
     ggsave(filename=output.name,lvi.plot,dpi = 300, width=10*clus_num,height=10*clus_num,units="cm")
   }
 
@@ -254,18 +292,20 @@ LVIclust <- function(
   raw.data$DEP <- factor(gwrfc.dep$DEP)
   raw.data$CLUSTER <- factor(gwrfc.shp@data$CLUSTER)
   raw.type <- sapply(raw.data,class)
-  #quantitative variables by cluster
+  #QUANTI variables by cluster
   quanti.df <- raw.data[,raw.type %in% "numeric",drop=F]
   quanti.df$CLUSTER <- raw.data$CLUSTER
   quanti.report <- x.summary(quanti.df,"mean")
   quanti.report$sd <- x.summary(quanti.df,"sd")[,3]
   quanti.report$min <- x.summary(quanti.df,"min")[,3]
   quanti.report$max <- x.summary(quanti.df,"max")[,3]
-  #qualitative variables by cluster
-  quali.df <- raw.data[,raw.type %in% "factor",drop=F]
+  #QUALI variables by cluster
+  quali.df <- raw.data[,raw.type %in% c("factor","character"),drop=F]
+  quanti.df$CLUSTER <- raw.data$CLUSTER
   quali.report <- x.summary(quali.df,"Mode")
-  #boxplot
+  #plots
   if(plots){
+    #for quantitative
     scale.vals <- scale(quanti.df[,1:(ncol(quanti.df)-1)])
     quanti.df[,1:(ncol(quanti.df)-1)] <- scale.vals
     scale.vals <- paste0(names(quanti.df)[1:(ncol(quanti.df)-1)],"\n","(",
@@ -273,9 +313,15 @@ LVIclust <- function(
                          round(attr(scale.vals,"scaled:scale"),2),")")
     names(quanti.df)[1:(ncol(quanti.df)-1)] <- scale.vals
     quanti.plot <- melt(quanti.df,id.vars="CLUSTER")
-    quanti.plot <- boxplot.raw(quanti.plot)
-    output.name <- paste0(output_folder,"/",clus_data,"_",clus_num,"clus_boxPlot.jpg")
+    quanti.plot <- boxplot.quanti(quanti.plot)
+    output.name <- paste0(output_folder,"/",clus_data,"_",clus_num,"clus_quantiPlot.jpg")
     ggsave(filename=output.name,quanti.plot,dpi = 300, width=10*clus_num,height=30,units="cm")
+    #for qualitative
+    quali.plot <- melt(quali.df,id.vars = "CLUSTER")
+    quali.plot <- hist.quali(quali.plot)
+    output.name <- paste0(output_folder,"/",clus_data,"_",clus_num,"clus_qualiPlot.jpg")
+    set.size <- sum(c(floor((ncol(quali.df)-1)/4),(ncol(quali.df)-1) %% 4))
+    ggsave(filename=output.name,quali.plot,dpi = 300, width=40,height=10*set.size,units="cm",limitsize=F)
   }
 
   #### ACCURACY REPORT ####
