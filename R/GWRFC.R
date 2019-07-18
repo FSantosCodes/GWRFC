@@ -39,14 +39,16 @@ GWRFC <- function(
 
   debug <- F
   if(debug){
-    input_shapefile = "C:/DATA/demo/deforestacion/def_consolidated.shp"
-    remove_columns = c("ID_grid")
-    dependent_varName = "fao"
+    input_shapefile = "C:/DATA/demo/educacion/cant_bach.shp"
+    remove_columns = c("ids", "DPA_V", "DPA_A", "DPA_C", "DPA_DESC", "DPA_P", "DPA_DESP",
+                       "CODIG", "INSTI", "REGIO", "REGIM", "ZONA_ DISTR", "CIRCU", "PROVI", "CANTO",
+                       "PARRO","ZONA_","DISTR")
+    dependent_varName = "CRITE"
     kernel_type = "exponential"
     kernel_adaptative = T
-    kernel_bandwidth = 400
+    kernel_bandwidth = 50
     number_cores = 3
-    output_folder = "C:/DATA/demo/deforestacion/resultados"
+    output_folder = "C:/DATA/demo/educacion/resultados"
   }
 
   ##### PREPARE DATA #####
@@ -71,22 +73,32 @@ GWRFC <- function(
     if(length(grep(paste(remove_columns,collapse="|"),names(model.shp))) != 0){
       model.shp <- model.shp[,!names(model.shp) %in% remove_columns]
     }else{
-      stop("'remove_columns' not found in 'input_shapefile'")
+      stop("remove_columns not found in input_shapefile")
     }
   }
-  #get dependent/independent columns
+  #test + get dependent column
   model.dep <- grep(dependent_varName,names(model.shp))
-  if(length(dependent_varName)==0){
+  if(length(model.dep)==0){
     stop("dependent_varName not found")
+  }else if(length(model.dep)>=2){
+    stop("Found two or more columnsnames in input_shapefile for the specified dependent_varName")
   }else if(length(unique(model.shp@data[,model.dep]))>=21){
     stop(paste0("dependent_varName has ",length(unique(model.shp@data[,model.dep])),
                 " classes. Consider to reduce it into 20 classes"))
   }
+  #get independent columns
   model.ind <- names(model.shp)[!grepl(dependent_varName,names(model.shp))]
   model.ind <- grep(paste(model.ind,collapse="|"),names(model.shp))
-  #prepare data + distance matrix
+  #prepare data + put as factor dep
   model.shp <- model.shp[,c(model.dep,model.ind)]
   model.shp@data[,1] <- factor(model.shp@data[,1])
+  #complete cases
+  pos.NA <- which(!complete.cases(model.shp@data))
+  if(length(pos.NA)!=0){
+    warning(paste0("input_shapefile has ",length(pos.NA)," incomplete case(s). Removing it/them..."))
+    model.shp <- model.shp[which(complete.cases(model.shp@data)),]
+  }
+  #distance matrix
   dmat <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp))
 
   ##### FUNCTIONS ####
@@ -268,6 +280,7 @@ GWRFC <- function(
   stopCluster(cl)
   #extract data results + reoder
   gwc.data <- do.call("rbind.data.frame",gwc.extract)
+  #gwc.data <- plyr::rbind.fill(gwc.extract)
 
   #### SAVE SHAPEFILE ####
 
