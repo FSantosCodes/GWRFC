@@ -1,14 +1,16 @@
 Package: GWRFC
 Title: Geographycally Weighted Random Forest Classification (GWRFC)
-Description: later
 Version: 0.9
+Description: Commonly, spatial data requires non-stationary modelling to capture relationships between variables. This has been satisfied by approaches such as the Geographically Weighted Regression (GWR; Fotheringham, Charlton, and Brunsdon 1998), which uses a moving window weightening technique to apply a linear regression model and determine variables effects. However, such approach has been criticized due to its sensitivity to multicollinearity and noisy data (Wheeler 2007). To overcome these issues, the library GWRFC replaces the linear regression model with the random forest algorithm (RF; Breiman 2001) applying case weights according to the weightening scheme of GWR in the bagging step of RF. As a result, GWRFC  produces spatial representations of variables importance, classification probabilities and accuracy of RF models at local level. Furthermore, the library GWRFC provides an additional function to cluster its outputs and facilitate their analysis and report.
 Author: Fabian Santos [aut, cre]
 Maintainer: Fabian Santos <fabian_santos_@hotmail.com>
 License: GPL-3
 URL: https://github.com/FSantosCodes
 Imports:
   caret,
+  digest,
   doParallel,
+  foreach,
   foreign,
   fpc,
   ggplot2,
@@ -33,3 +35,4 @@ Packaged: 2019-01-07
 Repository: GitHub
 Publication: 2019-01-07
 RoxygenNote: 6.1.1
+LazyData: true

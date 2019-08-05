@@ -1,13 +1,36 @@
 #'@title Geographically weighted Random Forest Classification (GWRFC)
-#'@description CHECK...
+#'@description GWRFC is function that replaces the linear regression model of the Geographically Weighted Regression (GWR; Fotheringham, Charlton, and Brunsdon 1998) with the random forest algorithm (RF; Breiman 2001). For this, it applies case weights according to the weightening scheme of GWR in the bagging step of RF. As a result, GWRFC  produces spatial representations of variables importance, classification probabilities and accuracy of RF models at local level.
 #'@param input_shapefile string or Spatial-class. Input shapefile with dependent and independent variables.  It can be the filename of the shapefile or an object of class SpatialPolygonsDataFrame or SpatialPointsDataFrame.
-#'@param remove_columns string. Remove specific variables from input_shapefile. Variables are identified by column name. NA ignores column remove.
-#'@param dependent_varName string. Dependent variable name. Must exists at input_shapefile and should be categorical (with not more than 20 classes).
+#'@param remove_columns string. Remove specific variables from \strong{input_shapefile}. Variables are identified by column name. NA ignores column remove.
+#'@param dependent_varName string. Dependent variable name. Must exists at \strong{input_shapefile} and should be categorical (with not more than 20 classes).
 #'@param kernel_type string. Kernel type to apply in GWRFC. It can be: 'gaussian', 'exponential', 'bisquare' or 'tricube'.
 #'@param kernel_adaptative logical. Is the kernel adaptative? otherwise it is considered as fixed.
-#'@param kernel_bandwidth numeric. Defines kernel bandwidth. If kernel_adaptative is TRUE, then you should define the number of local observations in the kernel, otherwise define you should define a distance to specify kernel bandwidth.
+#'@param kernel_bandwidth numeric. Defines kernel bandwidth. If \strong{kernel_adaptative} is TRUE, then you should define the number of local observations in the kernel, otherwise you should define a distance to specify kernel bandwidth. If the bandwidth is not enought to represent at least 5 observations per class, it is automatically expanded until all classes are represented.
 #'@param number_cores numeric. Number of cores for parallel processing. Cores are register and operated via doParallel, foreach and parallel packages. Be careful with increasing numbers of cores, as RAM memory may be not enough.
 #'@param output_folder string. Output folder where GWRFC outputs will be stored.
+#'@return As a result, a shapefile is created whose attribute table contains: \enumerate{
+#'                            \item Local variables importance: calculated via permutation for each variable and derived from each RF local models
+#'                            \item BEST: most important variable in the local RF model
+#'                            \item DEP: original value from dependent variable
+#'                            \item PRED: predicted class result
+#'                            \item P_: classification probabilities for each dependent variable classes
+#'                            \item FAIL: Is prediction result correct (as is compared with DEP)?
+#'                            \item KAPPA: accuracy according kappa index from RF local models
+#'                            \item BW: bandwidth applied
+#'                          }
+#'@examples
+#'#with deforestation dataset
+#'data(deforestation)
+#'
+#'#run the function (see coments for each parameter)
+#'GWRFC(input_shapefile = deforestation, #can be also a complete filename of .shp extension
+#'       remove_columns = c("ID_grid","L_oth"), #these variables are ignored in the analysis as are not informative
+#'       dependent_varName = "fao", #the depedent variable to evaluate, should be of class factor or character
+#'       kernel_type = "exponential", #the weightening function. Other functions are possible.
+#'       kernel_adaptative = T, #TRUE for adaptative or FALSE for a fixed distance
+#'       kernel_bandwidth = 400, #as the kerner is adaptative, 400 refers to the minimun number of observations
+#'       number_cores = 3, #3 cores used in an AMD A6/16 GB RAM computer.
+#'       output_folder = "C:/DATA/demo/") #check this folder for outputs
 #'@export
 
 GWRFC <- function(
@@ -20,36 +43,6 @@ GWRFC <- function(
   number_cores = 1,
   output_folder
 ){
-
-  ##### LIBRARIES #####
-
-  get.libraries <- function(libraries){
-    for (i in libraries){
-      if(!require(i,character.only=T)){
-        install.packages(i)
-        library(i,character.only=T)}
-    }
-  }
-
-  get.libraries(c("raster","GWmodel","caret","stringr","ranger","zoo","ggplot2",
-                  "rgeos","scales","doParallel","spgwr","parallel","plyr",
-                  "spdep","reshape","rgdal","gtools"))
-
-  ##### DEBUGGING #####
-
-  debug <- F
-  if(debug){
-    input_shapefile = "C:/DATA/demo/educacion/cant_bach.shp"
-    remove_columns = c("ids", "DPA_V", "DPA_A", "DPA_C", "DPA_DESC", "DPA_P", "DPA_DESP",
-                       "CODIG", "INSTI", "REGIO", "REGIM", "ZONA_ DISTR", "CIRCU", "PROVI", "CANTO",
-                       "PARRO","ZONA_","DISTR")
-    dependent_varName = "CRITE"
-    kernel_type = "exponential"
-    kernel_adaptative = T
-    kernel_bandwidth = 50
-    number_cores = 3
-    output_folder = "C:/DATA/demo/educacion/resultados"
-  }
 
   ##### PREPARE DATA #####
 

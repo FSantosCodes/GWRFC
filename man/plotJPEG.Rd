@@ -10,5 +10,5 @@ plotJPEG(input_jpeg, add = FALSE)
 \item{input_jpeg}{string. Input filename of JPG picture.}
 }
 \description{
-CHECK...
+Internal function to plot a JPEG file in R
 }

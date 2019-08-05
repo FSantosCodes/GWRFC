@@ -1,10 +1,8 @@
 #'@title Plot JPEG file using base graphics
-#'@description CHECK...
+#'@description Internal function to plot a JPEG file in R
 #'@param input_jpeg string. Input filename of JPG picture.
-#'@export
 
 plotJPEG <- function(input_jpeg,add=FALSE){
-  require('jpeg')
   jpg = readJPEG(input_jpeg, native=T) # read the file
   res = dim(jpg)[2:1] # get the resolution, [x, y]
   if (!add) # initialize an empty plot area if add==FALSE
