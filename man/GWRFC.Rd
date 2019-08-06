@@ -9,7 +9,7 @@ GWRFC(input_shapefile, remove_columns = NA, dependent_varName,
   number_cores = 1, output_folder)
 }
 \arguments{
-\item{input_shapefile}{string or Spatial-class. Input shapefile with dependent and independent variables.  It can be the filename of the shapefile or an object of class SpatialPolygonsDataFrame or SpatialPointsDataFrame.}
+\item{input_shapefile}{string or Spatial-class. Input shapefile with dependent and independent variables.  It can be the filename of the shapefile or an object of class {SpatialPolygonsDataFrame} or {SpatialPointsDataFrame}.}
 
 \item{remove_columns}{string. Remove specific variables from \strong{input_shapefile}. Variables are identified by column name. NA ignores column remove.}
 
@@ -36,6 +36,7 @@ As a result, a shapefile is created whose attribute table contains: \enumerate{
                            \item KAPPA: accuracy according kappa index from RF local models
                            \item BW: bandwidth applied
                          }
+       Aditionally, you can check processing evolution for the parallel computing process at \strong{output_folder} as: progress.txt
 }
 \description{
 GWRFC is function that replaces the linear regression model of the Geographically Weighted Regression (GWR; Fotheringham, Charlton, and Brunsdon 1998) with the random forest algorithm (RF; Breiman 2001). For this, it applies case weights according to the weightening scheme of GWR in the bagging step of RF. As a result, GWRFC  produces spatial representations of variables importance, classification probabilities and accuracy of RF models at local level.

@@ -1,6 +1,6 @@
 #'@title Geographically weighted Random Forest Classification (GWRFC)
 #'@description GWRFC is function that replaces the linear regression model of the Geographically Weighted Regression (GWR; Fotheringham, Charlton, and Brunsdon 1998) with the random forest algorithm (RF; Breiman 2001). For this, it applies case weights according to the weightening scheme of GWR in the bagging step of RF. As a result, GWRFC  produces spatial representations of variables importance, classification probabilities and accuracy of RF models at local level.
-#'@param input_shapefile string or Spatial-class. Input shapefile with dependent and independent variables.  It can be the filename of the shapefile or an object of class SpatialPolygonsDataFrame or SpatialPointsDataFrame.
+#'@param input_shapefile string or Spatial-class. Input shapefile with dependent and independent variables.  It can be the filename of the shapefile or an object of class {SpatialPolygonsDataFrame} or {SpatialPointsDataFrame}.
 #'@param remove_columns string. Remove specific variables from \strong{input_shapefile}. Variables are identified by column name. NA ignores column remove.
 #'@param dependent_varName string. Dependent variable name. Must exists at \strong{input_shapefile} and should be categorical (with not more than 20 classes).
 #'@param kernel_type string. Kernel type to apply in GWRFC. It can be: 'gaussian', 'exponential', 'bisquare' or 'tricube'.
@@ -18,6 +18,7 @@
 #'                            \item KAPPA: accuracy according kappa index from RF local models
 #'                            \item BW: bandwidth applied
 #'                          }
+#'        Aditionally, you can check processing evolution for the parallel computing process at \strong{output_folder} as: progress.txt
 #'@examples
 #'#with deforestation dataset
 #'data(deforestation)
@@ -68,7 +69,7 @@ GWRFC <- function(
     if(length(grep(paste(remove_columns,collapse="|"),names(model.shp))) != 0){
       model.shp <- model.shp[,!names(model.shp) %in% remove_columns]
     }else{
-      stop("remove_columns not found in input_shapefile")
+      stop("remove_columns not found at input_shapefile. Verify its names.")
     }
   }
   #test + get dependent column
@@ -76,10 +77,10 @@ GWRFC <- function(
   if(length(model.dep)==0){
     stop("dependent_varName not found")
   }else if(length(model.dep)>=2){
-    stop("Found two or more columnsnames in input_shapefile for the specified dependent_varName")
+    stop("Found two or more column names at input_shapefile for the specified dependent_varName. Rename it.")
   }else if(length(unique(model.shp@data[,model.dep]))>=21){
-    stop(paste0("dependent_varName has ",length(unique(model.shp@data[,model.dep])),
-                " classes. Consider to reduce it into 20 classes"))
+    warning(paste0("dependent_varName has ",length(unique(model.shp@data[,model.dep])),
+                " classes. Procede with caution or reduce them into around 10 interpretable classes"))
   }
   #get independent columns
   model.ind <- names(model.shp)[!grepl(dependent_varName,names(model.shp))]
@@ -93,8 +94,6 @@ GWRFC <- function(
     model.shp <- model.shp[which(complete.cases(model.shp@data)),]
     warning(paste0("input_shapefile has ",length(pos.NA)," incomplete case(s). Removing it/them..."))
   }
-  #distance matrix
-  dmat <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp))
 
   ##### FUNCTIONS ####
 
@@ -120,14 +119,14 @@ GWRFC <- function(
   apply.adaptative <- function(){
     #first run
     cell.data <- model.shp@data
-    cell.data$dist <- dmat[i,]
+    cell.data$dist <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp[i,]))[,1]
     cell.data <- cell.data[order(cell.data$dist)[1:kernel_bandwidth],]
     num.classes <- table(cell.data[,1])
     #expand kernel
     kernel.expand <- kernel_bandwidth
     while(any(num.classes<=4)){
       cell.data <- model.shp@data
-      cell.data$dist <- dmat[i,]
+      cell.data$dist <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp[i,]))[,1]
       kernel.expand <- kernel.expand + (kernel_bandwidth/10)
       cell.data <- cell.data[order(cell.data$dist)[1:kernel.expand],]
       num.classes <- table(cell.data[,1])
@@ -137,14 +136,14 @@ GWRFC <- function(
   apply.fixed <- function(){
     #first run
     cell.data <- model.shp@data
-    cell.data$dist <- dmat[i,]
+    cell.data$dist <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp[i,]))[,1]
     cell.data <- cell.data[cell.data$dist < kernel_bandwidth,]
     num.classes <- table(cell.data[,1])
     #expand kernel
     kernel.expand <- kernel_bandwidth
     while(any(num.classes<=4)){
       cell.data <- model.shp@data
-      cell.data$dist <- dmat[i,]
+      cell.data$dist <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp[i,]))[,1]
       kernel.expand <- kernel.expand + (kernel_bandwidth/10)
       cell.data <- cell.data[cell.data$dist < kernel.expand,]
       num.classes <- table(cell.data[,1])
