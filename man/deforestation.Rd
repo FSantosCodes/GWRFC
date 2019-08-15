@@ -8,10 +8,10 @@
 \describe{
   \item{ID_grid}{an unique numeric identifier for each grid cell}
   \item{fao}{annual deforestation rate (2000-2010)}
-  \item{A_cao}{Accessibility to coffee and cacao collection centers (hours)}
-  \item{A_fru}{Accessibility to fruits collection centers (hours)}
-  \item{A_mlk}{Accessibility to milk collection centers (hours)}
-  \item{A_plm}{Accessibility to palm oil extraction facilities (hours)}
+  \item{A_cao}{Accessibility to coffee and cacao collection centers (minutes)}
+  \item{A_fru}{Accessibility to fruits collection centers (minutes)}
+  \item{A_mlk}{Accessibility to milk collection centers (minutes)}
+  \item{A_plm}{Accessibility to palm oil extraction facilities (minutes)}
   \item{I_min}{Distance to mining blocks assigned between 2000 and 2010 (meters)}
   \item{I_ngt}{Stable nightlights trend 2000-2010 (slope)}
   \item{I_oil}{Distance to oil wells perforated between 2000 and 2010 (meters)}

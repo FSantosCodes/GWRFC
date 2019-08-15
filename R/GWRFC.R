@@ -17,6 +17,7 @@
 #'                            \item FAIL: Is prediction result correct (as is compared with DEP)?
 #'                            \item KAPPA: accuracy according kappa index from RF local models
 #'                            \item BW: bandwidth applied
+#'                            \item ID_row: an identifier to link rows with the original dataset
 #'                          }
 #'        Aditionally, you can check processing evolution for the parallel computing process at \strong{output_folder} as: progress.txt
 #'@examples
@@ -31,7 +32,7 @@
 #'       kernel_adaptative = T, #TRUE for adaptative or FALSE for a fixed distance
 #'       kernel_bandwidth = 400, #as the kerner is adaptative, 400 refers to the minimun number of observations
 #'       number_cores = 3, #3 cores used in an AMD A6/16 GB RAM computer.
-#'       output_folder = "C:/DATA/demo/") #check this folder for outputs
+#'       output_folder = "C:/DATA/demo/deforestation") #check this folder for outputs
 #'@export
 
 GWRFC <- function(
@@ -61,6 +62,10 @@ GWRFC <- function(
     model.shp <- input_shapefile
   }else{
     model.shp <- shapefile(input_shapefile)
+  }
+  #check logical structure
+  if(length(model.shp)<= kernel_bandwidth){
+    stop("kernel_bandwidth too large for input_shapefile features number")
   }
   #assign rownames
   rownames(model.shp@data) <- 1:length(model.shp)

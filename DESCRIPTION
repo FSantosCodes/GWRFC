@@ -17,6 +17,7 @@ Imports:
   gtools,
   GWmodel,
   jpeg,
+  kohonen,
   NbClust,
   parallel,
   plyr,
