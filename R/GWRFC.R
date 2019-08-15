@@ -129,10 +129,10 @@ GWRFC <- function(
     num.classes <- table(cell.data[,1])
     #expand kernel
     kernel.expand <- kernel_bandwidth
-    while(any(num.classes<=4)){
+    while(any(num.classes<=3)){
       cell.data <- model.shp@data
       cell.data$dist <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp[i,]))[,1]
-      kernel.expand <- kernel.expand + (kernel_bandwidth/10)
+      kernel.expand <- kernel.expand + (kernel_bandwidth/33)
       cell.data <- cell.data[order(cell.data$dist)[1:kernel.expand],]
       num.classes <- table(cell.data[,1])
     }
@@ -146,10 +146,10 @@ GWRFC <- function(
     num.classes <- table(cell.data[,1])
     #expand kernel
     kernel.expand <- kernel_bandwidth
-    while(any(num.classes<=4)){
+    while(any(num.classes<=3)){
       cell.data <- model.shp@data
       cell.data$dist <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp[i,]))[,1]
-      kernel.expand <- kernel.expand + (kernel_bandwidth/10)
+      kernel.expand <- kernel.expand + (kernel_bandwidth/33)
       cell.data <- cell.data[cell.data$dist < kernel.expand,]
       num.classes <- table(cell.data[,1])
     }
