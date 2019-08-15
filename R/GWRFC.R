@@ -78,7 +78,7 @@ GWRFC <- function(
     }
   }
   #test + get dependent column
-  model.dep <- grep(dependent_varName,names(model.shp))
+  model.dep <- grep(paste0("^",dependent_varName,"$"),names(model.shp))
   if(length(model.dep)==0){
     stop("dependent_varName not found")
   }else if(length(model.dep)>=2){
