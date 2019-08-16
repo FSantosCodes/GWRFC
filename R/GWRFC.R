@@ -24,7 +24,10 @@
 #'#with deforestation dataset
 #'data(deforestation)
 #'
-#'#run the function (see coments for each parameter)
+#'#as the dependent variable is a continuous value, here it is splited in quantiles
+#'deforestation@data$fao <- factor(cut(deforestation@data$fao,breaks=quantile(deforestation@data$fao,probs=seq(0,1,length.out=5)),labels=c("Q1","Q2","Q3","Q4"),include.lowest=T))
+#'
+#'#and then GWRFC is run (see coments for each parameter)
 #'GWRFC(input_shapefile = deforestation, #can be also a complete filename of .shp extension
 #'       remove_columns = c("ID_grid","L_oth"), #these variables are ignored in the analysis as are not informative
 #'       dependent_varName = "fao", #the depedent variable to evaluate, should be of class factor or character
@@ -129,10 +132,10 @@ GWRFC <- function(
     num.classes <- table(cell.data[,1])
     #expand kernel
     kernel.expand <- kernel_bandwidth
-    while(any(num.classes<=3)){
+    while(any(num.classes<=5)){
       cell.data <- model.shp@data
       cell.data$dist <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp[i,]))[,1]
-      kernel.expand <- kernel.expand + (kernel_bandwidth/33)
+      kernel.expand <- kernel.expand + (kernel_bandwidth/50)
       cell.data <- cell.data[order(cell.data$dist)[1:kernel.expand],]
       num.classes <- table(cell.data[,1])
     }
@@ -146,10 +149,10 @@ GWRFC <- function(
     num.classes <- table(cell.data[,1])
     #expand kernel
     kernel.expand <- kernel_bandwidth
-    while(any(num.classes<=3)){
+    while(any(num.classes<=5)){
       cell.data <- model.shp@data
       cell.data$dist <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp[i,]))[,1]
-      kernel.expand <- kernel.expand + (kernel_bandwidth/33)
+      kernel.expand <- kernel.expand + (kernel_bandwidth/50)
       cell.data <- cell.data[cell.data$dist < kernel.expand,]
       num.classes <- table(cell.data[,1])
     }
