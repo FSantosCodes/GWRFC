@@ -16,6 +16,7 @@ Imports:
   ggplot2,
   gtools,
   GWmodel,
+  iterators,
   jpeg,
   kohonen,
   NbClust,

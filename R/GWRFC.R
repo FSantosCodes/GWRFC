@@ -4,22 +4,22 @@
 #'@param remove_columns string. Remove specific variables from \strong{input_shapefile}. Variables are identified by column name. NA ignores column remove.
 #'@param dependent_varName string. Dependent variable name. Must exists at \strong{input_shapefile} and should be categorical (with not more than 20 classes).
 #'@param kernel_type string. Kernel type to apply in GWRFC. It can be: 'gaussian', 'exponential', 'bisquare' or 'tricube'.
-#'@param kernel_adaptative logical. Is the kernel adaptative? otherwise it is considered as fixed.
-#'@param kernel_bandwidth numeric. Defines kernel bandwidth. If \strong{kernel_adaptative} is TRUE, then you should define the number of local observations in the kernel, otherwise you should define a distance to specify kernel bandwidth. If the bandwidth is not enought to represent at least 5 observations per class, it is automatically expanded until all classes are represented.
+#'@param kernel_adaptative logical. Is the kernel adaptative? otherwise it is considered as fixed (larger processing time).
+#'@param kernel_bandwidth numeric. Defines kernel bandwidth. If \strong{kernel_adaptative} is TRUE, then you should define the number of local observations in the kernel, otherwise you should define a distance to specify kernel bandwidth.
+#'@param upsampling logical. If TRUE, upsampling is applied before random forest training, otherwise it is downsampled. Consider that upsampling is a bit more computing demanding but accuracy is improved.
 #'@param number_cores numeric. Number of cores for parallel processing. Cores are register and operated via doParallel, foreach and parallel packages. Be careful with increasing numbers of cores, as RAM memory may be not enough.
 #'@param output_folder string. Output folder where GWRFC outputs will be stored.
 #'@return As a result, a shapefile is created whose attribute table contains: \enumerate{
-#'                            \item Local variables importance: calculated via permutation for each variable and derived from each RF local models
-#'                            \item BEST: most important variable in the local RF model
-#'                            \item DEP: original value from dependent variable
-#'                            \item PRED: predicted class result
-#'                            \item P_: classification probabilities for each dependent variable classes
+#'                            \item Local variables importance: calculated via permutation for each variable and derived from each RF local models.
+#'                            \item BEST: most important variable in the local RF model.
+#'                            \item DEP: original value from dependent variable.
+#'                            \item PRED: predicted class result.
+#'                            \item P_: classification probabilities for each dependent variable classes.
 #'                            \item FAIL: Is prediction result correct (as is compared with DEP)?
-#'                            \item KAPPA: accuracy according kappa index from RF local models
-#'                            \item BW: bandwidth applied
-#'                            \item ID_row: an identifier to link rows with the original dataset
+#'                            \item KAPPA: accuracy according kappa index obtained from RF local models.
+#'                            \item ID_row: an identifier to link rows with the original dataset if incomplete cases are found.
 #'                          }
-#'        Aditionally, you can check processing evolution for the parallel computing process at \strong{output_folder} as: progress.txt
+#'        Aditionally, you can check processing evolution for the parallel computing at \strong{output_folder} as: data_progress.txt
 #'@examples
 #'#with deforestation dataset
 #'data(deforestation)
@@ -28,12 +28,13 @@
 #'deforestation@data$fao <- factor(cut(deforestation@data$fao,breaks=quantile(deforestation@data$fao,probs=seq(0,1,length.out=5)),labels=c("Q1","Q2","Q3","Q4"),include.lowest=T))
 #'
 #'#and then GWRFC is run (see coments for each parameter)
-#'GWRFC(input_shapefile = deforestation, #can be also a complete filename of .shp extension
-#'       remove_columns = c("ID_grid","L_oth"), #these variables are ignored in the analysis as are not informative
-#'       dependent_varName = "fao", #the depedent variable to evaluate, should be of class factor or character
-#'       kernel_type = "exponential", #the weightening function. Other functions are possible.
-#'       kernel_adaptative = T, #TRUE for adaptative or FALSE for a fixed distance
-#'       kernel_bandwidth = 400, #as the kerner is adaptative, 400 refers to the minimun number of observations
+#'GWRFC(input_shapefile = deforestation, #can be also a complete filename of .shp extension.
+#'       remove_columns = c("ID_grid","L_oth"), #these variables are ignored in the analysis as are not informative.
+#'       dependent_varName = "fao", #the depedent variable to evaluate, should be of class factor or character.
+#'       kernel_type = "exponential", #the weightening function. See above for other functions.
+#'       kernel_adaptative = T, #TRUE for adaptative or FALSE for a fixed kernel distance.
+#'       kernel_bandwidth = 400, #as the kerner is adaptative, 400 refers to the minimun number of observations.
+#'       upsampling = T, #improves accuracy but is a bit more computing costly.
 #'       number_cores = 3, #3 cores used in an AMD A6/16 GB RAM computer.
 #'       output_folder = "C:/DATA/demo/deforestation") #check this folder for outputs
 #'@export
@@ -45,6 +46,7 @@ GWRFC <- function(
   kernel_type = "exponential",
   kernel_adaptative = T,
   kernel_bandwidth,
+  upsampling = T,
   number_cores = 1,
   output_folder
 ){
@@ -93,20 +95,26 @@ GWRFC <- function(
   #get independent columns
   model.ind <- names(model.shp)[!grepl(dependent_varName,names(model.shp))]
   model.ind <- grep(paste(model.ind,collapse="|"),names(model.shp))
-  #prepare data + put as factor dep
+  #put as factor
   model.shp <- model.shp[,c(model.dep,model.ind)]
-  model.shp@data[,1] <- factor(model.shp@data[,1])
+  fac.vars <- sapply(model.shp@data,class)=="character"
+  if(any(fac.vars)){
+    model.shp@data[fac.vars] <- as.data.frame(lapply(model.shp@data[fac.vars],as.factor))
+  }
   #complete cases
   pos.NA <- which(!complete.cases(model.shp@data))
   if(length(pos.NA)!=0){
     model.shp <- model.shp[which(complete.cases(model.shp@data)),]
     warning(paste0("input_shapefile has ",length(pos.NA)," incomplete case(s). Removing it/them..."))
   }
+  #number and names of classses
+  dep.len <- nlevels(model.shp@data[,1])
+  dep.nam <- levels(model.shp@data[,1])
 
   ##### FUNCTIONS ####
 
   zero.variance <- function(x){
-    nzv <- nearZeroVar(x[-1], saveMetrics= TRUE)
+    nzv <- caret::nearZeroVar(x[-1], saveMetrics= TRUE)
     nzv.0 <- rownames(nzv)[nzv$zeroVar]
     if(length(nzv.0)!=0){
       x <- x[,!names(x) %in% nzv.0]
@@ -119,44 +127,10 @@ GWRFC <- function(
   corrupted.cases <- function(){
     cell.names <- sort(names(model.shp@data[,2:ncol(model.shp@data)]))
     probs.class <- paste0("P_",levels(model.shp@data[,1]))
-    cell.names <- c(cell.names,"BEST","DEP","PRED",probs.class,"FAIL","KAPPA","BW")
+    cell.names <- c(cell.names,"BEST","DEP","PRED",probs.class,"FAIL","KAPPA")
     cell.out <- as.data.frame(matrix(nrow=1,ncol=length(cell.names)))
     names(cell.out) <- cell.names
     return(cell.out)
-  }
-  apply.adaptative <- function(){
-    #first run
-    cell.data <- model.shp@data
-    cell.data$dist <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp[i,]))[,1]
-    cell.data <- cell.data[order(cell.data$dist)[1:kernel_bandwidth],]
-    num.classes <- table(cell.data[,1])
-    #expand kernel
-    kernel.expand <- kernel_bandwidth
-    while(any(num.classes<=5)){
-      cell.data <- model.shp@data
-      cell.data$dist <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp[i,]))[,1]
-      kernel.expand <- kernel.expand + (kernel_bandwidth/50)
-      cell.data <- cell.data[order(cell.data$dist)[1:kernel.expand],]
-      num.classes <- table(cell.data[,1])
-    }
-    return(list(cell.data,kernel.expand))
-  }
-  apply.fixed <- function(){
-    #first run
-    cell.data <- model.shp@data
-    cell.data$dist <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp[i,]))[,1]
-    cell.data <- cell.data[cell.data$dist < kernel_bandwidth,]
-    num.classes <- table(cell.data[,1])
-    #expand kernel
-    kernel.expand <- kernel_bandwidth
-    while(any(num.classes<=5)){
-      cell.data <- model.shp@data
-      cell.data$dist <- gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp[i,]))[,1]
-      kernel.expand <- kernel.expand + (kernel_bandwidth/50)
-      cell.data <- cell.data[cell.data$dist < kernel.expand,]
-      num.classes <- table(cell.data[,1])
-    }
-    return(list(cell.data,kernel.expand))
   }
   get.probs <- function(){
     x <- as.data.frame(predict(cell.rf,cell.i[,2:(ncol(cell.i)-1)])$predictions)
@@ -181,19 +155,18 @@ GWRFC <- function(
 
   print("Start processing...")
 
-  #process
+  #start cluster
   cl <- makeCluster(number_cores)
   registerDoParallel(cl)
-  gwc.extract <- foreach(i=1:nrow(model.shp@data),.packages=c("ranger","scales","caret","GWmodel"),.errorhandling="pass") %dopar% {
-    #subset by kernel_bandwidth
+  gwc.extract <- foreach(i=icount(length(model.shp)),.packages=c("ranger","scales","caret","GWmodel"),.errorhandling="pass") %dopar% {
+    init.time <- proc.time()
+    #order data by distance
+    cell.data <- model.shp@data
+    cell.data$dist <- GWmodel::gw.dist(dp.locat=coordinates(model.shp),rp.locat=coordinates(model.shp[i,]))[,1]
     if(kernel_adaptative){
-      cell.data <- apply.adaptative()
-      ker.bw <- cell.data[[2]]
-      cell.data <- cell.data[[1]]
+      cell.data <- cell.data[order(cell.data$dist)[1:kernel_bandwidth],]
     }else{
-      cell.data <- apply.fixed()
-      ker.bw <- cell.data[[2]]
-      cell.data <- cell.data[[1]]
+      cell.data <- cell.data[cell.data$dist < kernel_bandwidth,]
     }
     #get 'i' observation
     cell.i <- cell.data[1,]
@@ -204,13 +177,21 @@ GWRFC <- function(
       #drop unused levels
       cell.data[,1] <- droplevels(cell.data[,1])
       #balance + set levels in classification
-      cell.data <- upSample(cell.data[,2:ncol(cell.data)],cell.data[,1],yname=names(cell.data)[1])
-      cell.data <- cell.data[,c(ncol(cell.data),1:ncol(cell.data)-1)]
+      if(upsampling){
+        cell.data <- caret::upSample(x=cell.data[,2:ncol(cell.data)],
+                                     y=cell.data[,1],
+                                     yname=names(cell.data)[1])
+      }else{
+        cell.data <- caret::downSample(x=cell.data[,2:ncol(cell.data)],
+                                       y=cell.data[,1],
+                                       yname=names(cell.data)[1])
+      }
+      cell.data <- cell.data[,c(ncol(cell.data),1:(ncol(cell.data)-1))]
       #distance weights
-      cell.weights <- gw.weight(cell.data$dist,
-                                bw=kernel_bandwidth,
-                                kernel=kernel_type,
-                                adaptive=kernel_adaptative)
+      cell.weights <- GWmodel::gw.weight(cell.data$dist,
+                                         bw=kernel_bandwidth,
+                                         kernel=kernel_type,
+                                         adaptive=kernel_adaptative)
       #assign dependent + remove zero variance
       cell.data <- cell.data[,1:(ncol(cell.data)-1)]
       cell.vars <- sort(names(cell.data[,2:ncol(cell.data)]))
@@ -218,14 +199,14 @@ GWRFC <- function(
       names(cell.data)[1] <- dependent_varName
       #apply ranger: FIRST TIME
       cell.formula <- formula(paste0(dependent_varName," ~ ."))
-      cell.rf <- ranger(formula=cell.formula,
-                        data=cell.data,
-                        replace=F,
-                        min.node.size=1,
-                        scale.permutation.importance=T,
-                        case.weights=cell.weights,
-                        probability=T,
-                        importance="permutation")
+      cell.rf <- ranger::ranger(formula=cell.formula,
+                                data=cell.data,
+                                replace=T,
+                                min.node.size=1,
+                                scale.permutation.importance=T,
+                                case.weights=cell.weights,
+                                probability=T,
+                                importance="permutation")
       #extract important variables
       cell.best <- names(cell.rf$variable.importance)[cell.rf$variable.importance > 0]
       #CORRUPTED CASE 2: null calculation after run
@@ -235,14 +216,14 @@ GWRFC <- function(
         #apply ranger: SECOND TIME
         if(length(cell.best)!=length(cell.vars)){
           cell.formula <- formula(paste0(dependent_varName," ~ ",paste(cell.best,collapse=" + ")))
-          cell.rf <- ranger(formula=cell.formula,
-                            data=cell.data,
-                            replace=F,
-                            min.node.size=1,
-                            scale.permutation.importance=T,
-                            case.weights=cell.weights,
-                            probability=T,
-                            importance="permutation")
+          cell.rf <- ranger::ranger(formula=cell.formula,
+                                    data=cell.data,
+                                    replace=T,
+                                    min.node.size=1,
+                                    scale.permutation.importance=T,
+                                    case.weights=cell.weights,
+                                    probability=T,
+                                    importance="permutation")
         }
         #extract importance
         cell.out <- data.frame(t(matrix(cell.rf$variable.importance)))
@@ -256,7 +237,7 @@ GWRFC <- function(
           cell.out <- cbind(cell.out,cell.val)
         }
         cell.out <- cell.out[sort(names(cell.out))]
-        #get three best variables
+        #get best variable
         cell.out$BEST <- head(names(cell.out[order(cell.out,decreasing=T)]),3)[1]
         #get dependent
         cell.out$DEP <- as.character(cell.i[,1])
@@ -264,23 +245,28 @@ GWRFC <- function(
         cell.out$PRED <- get.probsClass()[[1]]
         #get probabilities
         cell.out.prob <- get.probsClass()[[2]]
+        if(length(cell.out.prob)!=dep.len){
+          miss.class <- as.data.frame(matrix(rep(0,dep.len),nrow=1,ncol=dep.len))
+          names(miss.class) <- dep.nam
+          miss.class[which(dep.nam %in% names(cell.out.prob))] <- cell.out.prob
+          cell.out.prob <- miss.class
+        }
         names(cell.out.prob) <- paste0("P_", names(cell.out.prob))
         cell.out <- cbind(cell.out,as.data.frame(cell.out.prob))
         #get accuracies metrics
         cell.out$FAIL <- ifelse(cell.out$DEP!=cell.out$PRED,"yes","no")
         cell.out$KAPPA <- get.kappa()
-        #get bandwidth applied
-        cell.out$BW <- ker.bw
       }
     }
     #status text
-    cat(paste0(as.character(i)," of ",nrow(model.shp@data)," \n"),
-        file=paste0(output_folder,"/progress.txt"), append=TRUE)
+    init.time <- round(proc.time()-init.time,2)
+    cat(paste0(as.character(i)," of ",length(model.shp)," - time elapsed: ",init.time[3],"\n"),
+        file=paste0(output_folder,"/data_progress.txt"), append=TRUE)
     #end
     return(cell.out)
   }
   stopCluster(cl)
-  #extract data results + reoder
+  #consolidate results
   gwc.data <- do.call("rbind.data.frame",gwc.extract)
   #add original rownames
   gwc.data$ID_row <- rownames(model.shp@data)

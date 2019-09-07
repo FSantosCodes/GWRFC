@@ -6,7 +6,7 @@
 \usage{
 GWRFC(input_shapefile, remove_columns = NA, dependent_varName,
   kernel_type = "exponential", kernel_adaptative = T, kernel_bandwidth,
-  number_cores = 1, output_folder)
+  upsampling = T, number_cores = 1, output_folder)
 }
 \arguments{
 \item{input_shapefile}{string or Spatial-class. Input shapefile with dependent and independent variables.  It can be the filename of the shapefile or an object of class {SpatialPolygonsDataFrame} or {SpatialPointsDataFrame}.}
@@ -17,9 +17,11 @@ GWRFC(input_shapefile, remove_columns = NA, dependent_varName,
 
 \item{kernel_type}{string. Kernel type to apply in GWRFC. It can be: 'gaussian', 'exponential', 'bisquare' or 'tricube'.}
 
-\item{kernel_adaptative}{logical. Is the kernel adaptative? otherwise it is considered as fixed.}
+\item{kernel_adaptative}{logical. Is the kernel adaptative? otherwise it is considered as fixed (larger processing time).}
 
-\item{kernel_bandwidth}{numeric. Defines kernel bandwidth. If \strong{kernel_adaptative} is TRUE, then you should define the number of local observations in the kernel, otherwise you should define a distance to specify kernel bandwidth. If the bandwidth is not enought to represent at least 5 observations per class, it is automatically expanded until all classes are represented.}
+\item{kernel_bandwidth}{numeric. Defines kernel bandwidth. If \strong{kernel_adaptative} is TRUE, then you should define the number of local observations in the kernel, otherwise you should define a distance to specify kernel bandwidth.}
+
+\item{upsampling}{logical. If TRUE, upsampling is applied before random forest training, otherwise it is downsampled. Consider that upsampling is a bit more computing demanding but accuracy is improved.}
 
 \item{number_cores}{numeric. Number of cores for parallel processing. Cores are register and operated via doParallel, foreach and parallel packages. Be careful with increasing numbers of cores, as RAM memory may be not enough.}
 
@@ -27,17 +29,16 @@ GWRFC(input_shapefile, remove_columns = NA, dependent_varName,
 }
 \value{
 As a result, a shapefile is created whose attribute table contains: \enumerate{
-                           \item Local variables importance: calculated via permutation for each variable and derived from each RF local models
-                           \item BEST: most important variable in the local RF model
-                           \item DEP: original value from dependent variable
-                           \item PRED: predicted class result
-                           \item P_: classification probabilities for each dependent variable classes
+                           \item Local variables importance: calculated via permutation for each variable and derived from each RF local models.
+                           \item BEST: most important variable in the local RF model.
+                           \item DEP: original value from dependent variable.
+                           \item PRED: predicted class result.
+                           \item P_: classification probabilities for each dependent variable classes.
                            \item FAIL: Is prediction result correct (as is compared with DEP)?
-                           \item KAPPA: accuracy according kappa index from RF local models
-                           \item BW: bandwidth applied
-                           \item ID_row: an identifier to link rows with the original dataset
+                           \item KAPPA: accuracy according kappa index obtained from RF local models.
+                           \item ID_row: an identifier to link rows with the original dataset if incomplete cases are found.
                          }
-       Aditionally, you can check processing evolution for the parallel computing process at \strong{output_folder} as: progress.txt
+       Aditionally, you can check processing evolution for the parallel computing at \strong{output_folder} as: data_progress.txt
 }
 \description{
 GWRFC is function that replaces the linear regression model of the Geographically Weighted Regression (GWR; Fotheringham, Charlton, and Brunsdon 1998) with the random forest algorithm (RF; Breiman 2001). For this, it applies case weights according to the weightening scheme of GWR in the bagging step of RF. As a result, GWRFC  produces spatial representations of variables importance, classification probabilities and accuracy of RF models at local level.
@@ -50,12 +51,13 @@ data(deforestation)
 deforestation@data$fao <- factor(cut(deforestation@data$fao,breaks=quantile(deforestation@data$fao,probs=seq(0,1,length.out=5)),labels=c("Q1","Q2","Q3","Q4"),include.lowest=T))
 
 #and then GWRFC is run (see coments for each parameter)
-GWRFC(input_shapefile = deforestation, #can be also a complete filename of .shp extension
-      remove_columns = c("ID_grid","L_oth"), #these variables are ignored in the analysis as are not informative
-      dependent_varName = "fao", #the depedent variable to evaluate, should be of class factor or character
-      kernel_type = "exponential", #the weightening function. Other functions are possible.
-      kernel_adaptative = T, #TRUE for adaptative or FALSE for a fixed distance
-      kernel_bandwidth = 400, #as the kerner is adaptative, 400 refers to the minimun number of observations
+GWRFC(input_shapefile = deforestation, #can be also a complete filename of .shp extension.
+      remove_columns = c("ID_grid","L_oth"), #these variables are ignored in the analysis as are not informative.
+      dependent_varName = "fao", #the depedent variable to evaluate, should be of class factor or character.
+      kernel_type = "exponential", #the weightening function. See above for other functions.
+      kernel_adaptative = T, #TRUE for adaptative or FALSE for a fixed kernel distance.
+      kernel_bandwidth = 400, #as the kerner is adaptative, 400 refers to the minimun number of observations.
+      upsampling = T, #improves accuracy but is a bit more computing costly.
       number_cores = 3, #3 cores used in an AMD A6/16 GB RAM computer.
       output_folder = "C:/DATA/demo/deforestation") #check this folder for outputs
 }

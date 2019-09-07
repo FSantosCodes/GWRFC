@@ -14,9 +14,9 @@ LVIclust(input_shapefile, input_GWRFC, method_hc = "ward.D2",
 
 \item{method_hc}{string. A method to use for hierarchical clustering with hclust. It can be:"ward.D","ward.D2","single","complete","average","mcquitty","median", "centroid" or "SOM". The latter, is calculated with the kohonen library.}
 
-\item{clus_data}{string. Data which should be used in clustering. It can be "LVI" to refer to all LVI variables used during GWRFC. Other specific column at input_GWRFC can be also used. In this case, hierarchical clustering is not applied and target variable is reclassified into quantiles if data is numerical, otherwise input is converted to factor and its levels used report.}
+\item{clus_data}{string. Data which should be used in clustering. It can be "LVI" to refer to all LVI variables used during GWRFC. Other specific column at input_GWRFC can be also used. In this case, hierarchical clustering is not applied and target variable is reclassified into quantiles if data is numerical, otherwise input is converted to factor and its levels used for report.}
 
-\item{clus_num}{numeric or string. If applies hierarchical clustering, then it is the number of clusters; otherwise it is the number of quantiles to use. If it is defined as 'auto' (default), then a number is calculated via Calinski-Harabasz Index in hierarchical clustering or defined in 5 for quantiles.}
+\item{clus_num}{numeric or string. If applies hierarchical clustering, then it is the number of clusters. If it is defined as 'auto' (default), it is automatically calculated applying Calinski-Harabasz Index.}
 
 \item{plots}{logical. If true, plots are generated and stored in the output_folder.}
 

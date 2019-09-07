@@ -3,8 +3,8 @@
 #'@param input_shapefile string or Spatial-class. Input shapefile with dependent and independent variables. It can be the filename of the shapefile or an object of class SpatialPolygonsDataFrame or SpatialPointsDataFrame.
 #'@param input_GWRFC string or Spatial-class. Input shapefile of GWRFC outputs. It can be the filename of the shapefile or an object of class SpatialPolygonsDataFrame or SpatialPointsDataFrame.
 #'@param method_hc string. A method to use for hierarchical clustering with hclust. It can be:"ward.D","ward.D2","single","complete","average","mcquitty","median", "centroid" or "SOM". The latter, is calculated with the kohonen library.
-#'@param clus_data string. Data which should be used in clustering. It can be "LVI" to refer to all LVI variables used during GWRFC. Other specific column at input_GWRFC can be also used. In this case, hierarchical clustering is not applied and target variable is reclassified into quantiles if data is numerical, otherwise input is converted to factor and its levels used report.
-#'@param clus_num numeric or string. If applies hierarchical clustering, then it is the number of clusters; otherwise it is the number of quantiles to use. If it is defined as 'auto' (default), then a number is calculated via Calinski-Harabasz Index in hierarchical clustering or defined in 5 for quantiles.
+#'@param clus_data string. Data which should be used in clustering. It can be "LVI" to refer to all LVI variables used during GWRFC. Other specific column at input_GWRFC can be also used. In this case, hierarchical clustering is not applied and target variable is reclassified into quantiles if data is numerical, otherwise input is converted to factor and its levels used for report.
+#'@param clus_num numeric or string. If applies hierarchical clustering, then it is the number of clusters. If it is defined as 'auto' (default), it is automatically calculated applying Calinski-Harabasz Index.
 #'@param plots logical. If true, plots are generated and stored in the output_folder.
 #'@param output_folder string. Output folder where LVIclust outputs will be stored.
 #'@return The output of this function is a shapefile with the resulting clusters, a summary for each cluster stored in a .rds file, and optionally a series of plots to visualize the report.
@@ -63,12 +63,22 @@ LVIclust <- function(
   gwrfc.shp@data$ID_row <- NULL
   #get LVI & model results + filter columns in RAW
   target.names <- names(gwrfc.shp@data)[grep("P_",names(gwrfc.shp@data))]
-  target.names  <- c("BEST","DEP","PRED",target.names,"FAIL","KAPPA","BW")
+  target.names  <- c("BEST","DEP","PRED",target.names,"FAIL","KAPPA")
   gwrfc.dep <- gwrfc.shp@data[,which(names(gwrfc.shp@data) %in% target.names)]
+  if(clus_data != "LVI"){
+    if(!any(names(gwrfc.dep) %in% clus_data)){
+      stop("clus_data not found")
+    }
+  }
   gwrfc.shp@data <- gwrfc.shp@data[,which(!names(gwrfc.shp@data) %in% target.names)]
   raw.data <- raw.data[,which(names(raw.data) %in% names(gwrfc.shp@data))]
 
   #### FUNCTIONS ####
+
+  ApplyQuintiles <- function(x) {
+    cut(x, breaks=c(quantile(df$orders, probs = seq(0, 1, by = 0.20))),
+        labels=c("0-20","20-40","40-60","60-80","80-100"), include.lowest=TRUE)
+  }
 
   bar.lvi <- function(x){
     #plot
@@ -247,8 +257,6 @@ LVIclust <- function(
         warning("elbow not found. Assumed 2 clusters...")
         clus_num <- 2
       }
-      #plot(1:19,unlist(cal.vals),xlab="Number of clusters",ylab="Calinhara index")
-      #abline(v=clus_num,col="red",lty=3)
     }
 
     # REPORT WITH SOM
@@ -259,7 +267,8 @@ LVIclust <- function(
       som_grid <- somgrid(xdim = 5, ydim=5, topo="hexagonal")
       som.data <- as.matrix(scale(gwrfc.shp@data))
       som_model <- som(som.data, grid = som_grid)
-      som_cluster <- cutree(hclust(dist(unlist(som_model$codes))),clus_num)
+      som_cluster <- cutree(hclust(dist(unlist(som_model$codes))),k=clus_num)
+
       #plot SOM quality
       if(plots){
         som.plots <- c("codes", "changes", "counts","dist.neighbours", "mapping", "quality")
@@ -304,16 +313,12 @@ LVIclust <- function(
 
     # REPORT ISOLATING VARIABLE
 
-    clus_num <- ifelse(clus_num=="auto",5,clus_num)
-    if(length(grep(clus_data,names(gwrfc.dep)))==0){
-      stop("clus_data not found")
-    }
     gwrfc.shp@data$CLUSTER <- gwrfc.dep[,grep(clus_data,names(gwrfc.dep))]
     if(class(gwrfc.shp@data$CLUSTER)!="factor"|class(gwrfc.shp@data$CLUSTER)!="character"){
-      gwrfc.shp@data$CLUSTER <- base::cut(gwrfc.shp@data$CLUSTER,
-                                          breaks=quantile(gwrfc.shp@data$CLUSTER,probs=seq(0,1,length.out=clus_num)),
-                                          labels=paste0("Q",floor(seq(0,1,length.out=clus_num)*100))[2:clus_num],
-                                          include.lowest=T)
+      breaks.val <- gwrfc.shp@data$CLUSTER
+      breaks.val <- c(-Inf,summary(breaks.val)[2],summary(breaks.val)[3],summary(breaks.val)[5],Inf)
+      labels.val <- c("Q25","Q50","Q75","Q100")
+      gwrfc.shp@data$CLUSTER <- base::cut(as.numeric(gwrfc.shp@data$CLUSTER),breaks=breaks.val,labels=labels.val)
     }else{
       gwrfc.shp@data$CLUSTER <- factor(gwrfc.shp@data$CLUSTER)
     }
@@ -388,7 +393,7 @@ LVIclust <- function(
   #get accuracy data
   acc.data <- gwrfc.dep
   acc.data$CLUSTER <- raw.data$CLUSTER
-  acc.data <- acc.data[,names(acc.data) %in% c("KAPPA","BW","CLUSTER")]
+  acc.data <- acc.data[,names(acc.data) %in% c("KAPPA","CLUSTER")]
   acc.report <- x.summary(acc.data,"mean")
   acc.report$sd <- x.summary(acc.data,"sd")[,3]
   acc.report$min <- x.summary(acc.data,"min")[,3]
@@ -414,6 +419,7 @@ LVIclust <- function(
   output.name <- paste0(output_folder,"/",clus_data,"_",clus_num,"clus_report.rds")
   saveRDS(report.data,output.name)
   print("****LVIclust end sucessfully*****")
+  return(report.data)
 }
 
 
