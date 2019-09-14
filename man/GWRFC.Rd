@@ -5,8 +5,8 @@
 \title{Geographically weighted Random Forest Classification (GWRFC)}
 \usage{
 GWRFC(input_shapefile, remove_columns = NA, dependent_varName,
-  kernel_type = "exponential", kernel_adaptative = T, kernel_bandwidth,
-  upsampling = T, number_cores = 1, output_folder)
+  kernel_function = "exponential", kernel_adaptative = T,
+  kernel_bandwidth, upsampling = T, number_cores = 1, output_folder)
 }
 \arguments{
 \item{input_shapefile}{string or Spatial-class. Input shapefile with dependent and independent variables.  It can be the filename of the shapefile or an object of class {SpatialPolygonsDataFrame} or {SpatialPointsDataFrame}.}
@@ -15,7 +15,7 @@ GWRFC(input_shapefile, remove_columns = NA, dependent_varName,
 
 \item{dependent_varName}{string. Dependent variable name. Must exists at \strong{input_shapefile} and should be categorical (with not more than 20 classes).}
 
-\item{kernel_type}{string. Kernel type to apply in GWRFC. It can be: 'gaussian', 'exponential', 'bisquare' or 'tricube'.}
+\item{kernel_function}{string. Kernel type to apply in GWRFC. It can be: 'gaussian', 'exponential', 'bisquare' or 'tricube'.}
 
 \item{kernel_adaptative}{logical. Is the kernel adaptative? otherwise it is considered as fixed (larger processing time).}
 
@@ -54,7 +54,7 @@ deforestation@data$fao <- factor(cut(deforestation@data$fao,breaks=quantile(defo
 GWRFC(input_shapefile = deforestation, #can be also a complete filename of .shp extension.
       remove_columns = c("ID_grid","L_oth"), #these variables are ignored in the analysis as are not informative.
       dependent_varName = "fao", #the depedent variable to evaluate, should be of class factor or character.
-      kernel_type = "exponential", #the weightening function. See above for other functions.
+      kernel_function = "exponential", #the weightening function. See above for other functions.
       kernel_adaptative = T, #TRUE for adaptative or FALSE for a fixed kernel distance.
       kernel_bandwidth = 400, #as the kerner is adaptative, 400 refers to the minimun number of observations.
       upsampling = T, #improves accuracy but is a bit more computing costly.

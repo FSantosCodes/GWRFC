@@ -3,7 +3,7 @@
 #'@param input_shapefile string or Spatial-class. Input shapefile with dependent and independent variables.  It can be the filename of the shapefile or an object of class {SpatialPolygonsDataFrame} or {SpatialPointsDataFrame}.
 #'@param remove_columns string. Remove specific variables from \strong{input_shapefile}. Variables are identified by column name. NA ignores column remove.
 #'@param dependent_varName string. Dependent variable name. Must exists at \strong{input_shapefile} and should be categorical (with not more than 20 classes).
-#'@param kernel_type string. Kernel type to apply in GWRFC. It can be: 'gaussian', 'exponential', 'bisquare' or 'tricube'.
+#'@param kernel_function string. Kernel type to apply in GWRFC. It can be: 'gaussian', 'exponential', 'bisquare' or 'tricube'.
 #'@param kernel_adaptative logical. Is the kernel adaptative? otherwise it is considered as fixed (larger processing time).
 #'@param kernel_bandwidth numeric. Defines kernel bandwidth. If \strong{kernel_adaptative} is TRUE, then you should define the number of local observations in the kernel, otherwise you should define a distance to specify kernel bandwidth.
 #'@param upsampling logical. If TRUE, upsampling is applied before random forest training, otherwise it is downsampled. Consider that upsampling is a bit more computing demanding but accuracy is improved.
@@ -31,7 +31,7 @@
 #'GWRFC(input_shapefile = deforestation, #can be also a complete filename of .shp extension.
 #'       remove_columns = c("ID_grid","L_oth"), #these variables are ignored in the analysis as are not informative.
 #'       dependent_varName = "fao", #the depedent variable to evaluate, should be of class factor or character.
-#'       kernel_type = "exponential", #the weightening function. See above for other functions.
+#'       kernel_function = "exponential", #the weightening function. See above for other functions.
 #'       kernel_adaptative = T, #TRUE for adaptative or FALSE for a fixed kernel distance.
 #'       kernel_bandwidth = 400, #as the kerner is adaptative, 400 refers to the minimun number of observations.
 #'       upsampling = T, #improves accuracy but is a bit more computing costly.
@@ -43,7 +43,7 @@ GWRFC <- function(
   input_shapefile,
   remove_columns = NA,
   dependent_varName,
-  kernel_type = "exponential",
+  kernel_function = "exponential",
   kernel_adaptative = T,
   kernel_bandwidth,
   upsampling = T,
@@ -190,7 +190,7 @@ GWRFC <- function(
       #distance weights
       cell.weights <- GWmodel::gw.weight(cell.data$dist,
                                          bw=kernel_bandwidth,
-                                         kernel=kernel_type,
+                                         kernel=kernel_function,
                                          adaptive=kernel_adaptative)
       #assign dependent + remove zero variance
       cell.data <- cell.data[,1:(ncol(cell.data)-1)]
@@ -280,7 +280,7 @@ GWRFC <- function(
   output.name <- paste0(output_folder,"/GWRFC_",
                         ifelse(kernel_adaptative,"ADP_","FIX_"),
                         kernel_bandwidth,"_",
-                        kernel_type,".shp")
+                        kernel_function,".shp")
   shapefile(model.shp,output.name,overwrite=T)
   #error warning
   if(length(which(is.na(model.shp@data$PRED)))!=0){
