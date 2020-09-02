@@ -41,3 +41,5 @@ Repository: GitHub
 Publication: 2019-01-07
 RoxygenNote: 7.1.0
 LazyData: true
+Depends: 
+    R (>= 2.10)
