@@ -2,11 +2,21 @@
 % Please edit documentation in R/GWRFC.R
 \name{GWRFC}
 \alias{GWRFC}
-\title{Geographically weighted Random Forest Classification (GWRFC)}
+\title{Geographically weighted Random Forest Classification}
 \usage{
-GWRFC(input_shapefile, remove_columns = NA, dependent_varName,
-  kernel_function = "exponential", kernel_adaptative = T,
-  kernel_bandwidth, upsampling = T, number_cores = 1, output_folder)
+GWRFC(
+  input_shapefile,
+  remove_columns = NA,
+  dependent_varName,
+  kernel_function = "exponential",
+  kernel_adaptative = T,
+  kernel_bandwidth,
+  upsampling = T,
+  save_models = F,
+  enable_pdp = F,
+  number_cores = 1,
+  output_folder
+)
 }
 \arguments{
 \item{input_shapefile}{string or Spatial-class. Input shapefile with dependent and independent variables.  It can be the filename of the shapefile or an object of class {SpatialPolygonsDataFrame} or {SpatialPointsDataFrame}.}
@@ -23,41 +33,42 @@ GWRFC(input_shapefile, remove_columns = NA, dependent_varName,
 
 \item{upsampling}{logical. If TRUE, upsampling is applied before random forest training, otherwise it is downsampled. Consider that upsampling is a bit more computing demanding but accuracy is improved.}
 
+\item{save_models}{logical. If TRUE, random forest models are stored at \strong{output_folder} as a RDS file. Beware it can be large, therefore storage requires hard drive memory and can slow down algorithm exit.}
+
+\item{enable_pdp}{logical. --EXPERIMENTAL-- If TRUE, partial dependence plots YHAT maximun, together with its correspondent independent variable value (PDP) are calculated.}
+
 \item{number_cores}{numeric. Number of cores for parallel processing. Cores are register and operated via doParallel, foreach and parallel packages. Be careful with increasing numbers of cores, as RAM memory may be not enough.}
 
 \item{output_folder}{string. Output folder where GWRFC outputs will be stored.}
 }
 \value{
-As a result, a shapefile is created whose attribute table contains: \enumerate{
-                           \item Local variables importance: calculated via permutation for each variable and derived from each RF local models.
-                           \item BEST: most important variable in the local RF model.
-                           \item DEP: original value from dependent variable.
-                           \item PRED: predicted class result.
-                           \item P_: classification probabilities for each dependent variable classes.
-                           \item FAIL: Is prediction result correct (as is compared with DEP)?
-                           \item KAPPA: accuracy according kappa index obtained from RF local models.
-                           \item ID_row: an identifier to link rows with the original dataset if incomplete cases are found.
-                         }
-       Aditionally, you can check processing evolution for the parallel computing at \strong{output_folder} as: data_progress.txt
+As a result, four shapefiles are created whose prefixes refer to: \enumerate{
+                           \item LVI: Local variables importance. Calculated via permutation for each variable.
+                           \item PDP: Independent variables local maxima (class or value). Identified when YHAT reach its maximum during RF model marginalization. Calculated for each variable.
+                           \item YHAT: Prediction result for \strong{dependent_varName} when PDP local maxima is applied. Calculated for each variable.
+                           \item ACC: Prediction and accuracies: predicted class, kappa from Out-of-Bag, classes probabilities and prediction failures.
+                          }
+       In all shapefiles cases, a column called 'ID_row' refers to rownames of \strong{input_shapefile}. In addition, processing evolution can be monitored at \strong{output_folder} as: data_progress.txt
 }
 \description{
-GWRFC is function that replaces the linear regression model of the Geographically Weighted Regression (GWR; Fotheringham, Charlton, and Brunsdon 1998) with the random forest algorithm (RF; Breiman 2001). For this, it applies case weights according to the weightening scheme of GWR in the bagging step of RF. As a result, GWRFC  produces spatial representations of variables importance, classification probabilities and accuracy of RF models at local level.
+GWRFC is a software for analyze and explore spatial data. It constructs geographically weighted models (GW; Fotheringham et al. 1998) to train random forest (RF; Breiman 2001) and report local models with partial depende plots (PDP, Greenwell, 2019). Prediction results and accurancy metrics (ACC) are also representated accondingly.
 }
 \examples{
 #with deforestation dataset
 data(deforestation)
 
-#as the dependent variable is a continuous value, here it is splited in quantiles
-deforestation@data$fao <- factor(cut(deforestation@data$fao,breaks=quantile(deforestation@data$fao,probs=seq(0,1,length.out=5)),labels=c("Q1","Q2","Q3","Q4"),include.lowest=T))
+#observe column names
+names(deforestation)
 
-#and then GWRFC is run (see coments for each parameter)
-GWRFC(input_shapefile = deforestation, #can be also a complete filename of .shp extension.
-      remove_columns = c("ID_grid","L_oth"), #these variables are ignored in the analysis as are not informative.
-      dependent_varName = "fao", #the depedent variable to evaluate, should be of class factor or character.
-      kernel_function = "exponential", #the weightening function. See above for other functions.
-      kernel_adaptative = T, #TRUE for adaptative or FALSE for a fixed kernel distance.
-      kernel_bandwidth = 400, #as the kerner is adaptative, 400 refers to the minimun number of observations.
-      upsampling = T, #improves accuracy but is a bit more computing costly.
-      number_cores = 3, #3 cores used in an AMD A6/16 GB RAM computer.
-      output_folder = "C:/DATA/demo/deforestation") #check this folder for outputs
+GWRFC(input_shapefile = deforestation,
+      remove_columns = c("ID_grid","L_oth"),
+      dependent_varName = "fao", #5 classes
+      kernel_function = "exponential",
+      kernel_adaptative = T,
+      kernel_bandwidth = 400,
+      upsampling = T,
+      save_models = F,
+      enable_pdp = F,
+      number_cores = 3, #3 cores available for an AMD A6/16 GB RAM computer.
+      output_folder = "E:/demo/test")
 }

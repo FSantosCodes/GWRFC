@@ -16,11 +16,14 @@ Imports:
   ggplot2,
   gtools,
   GWmodel,
+  gridExtra,
   iterators,
   jpeg,
   kohonen,
   NbClust,
+  mclust,
   parallel,
+  pdp,
   plyr,
   pracma,
   ranger,
@@ -36,5 +39,5 @@ Imports:
 Packaged: 2019-01-07
 Repository: GitHub
 Publication: 2019-01-07
-RoxygenNote: 6.1.1
+RoxygenNote: 7.1.0
 LazyData: true

@@ -1,5 +1,5 @@
-#'@title Geographically weighted Random Forest Classification (GWRFC)
-#'@description GWRFC is function that replaces the linear regression model of the Geographically Weighted Regression (GWR; Fotheringham, Charlton, and Brunsdon 1998) with the random forest algorithm (RF; Breiman 2001). For this, it applies case weights according to the weightening scheme of GWR in the bagging step of RF. As a result, GWRFC  produces spatial representations of variables importance, classification probabilities and accuracy of RF models at local level.
+#'@title Geographically weighted Random Forest Classification
+#'@description GWRFC is a software for analyze and explore spatial data. It constructs geographically weighted models (GW; Fotheringham et al. 1998) to train random forest (RF; Breiman 2001) and report local models with partial depende plots (PDP, Greenwell, 2019). Prediction results and accurancy metrics (ACC) are also representated accondingly.
 #'@param input_shapefile string or Spatial-class. Input shapefile with dependent and independent variables.  It can be the filename of the shapefile or an object of class {SpatialPolygonsDataFrame} or {SpatialPointsDataFrame}.
 #'@param remove_columns string. Remove specific variables from \strong{input_shapefile}. Variables are identified by column name. NA ignores column remove.
 #'@param dependent_varName string. Dependent variable name. Must exists at \strong{input_shapefile} and should be categorical (with not more than 20 classes).
@@ -7,36 +7,35 @@
 #'@param kernel_adaptative logical. Is the kernel adaptative? otherwise it is considered as fixed (larger processing time).
 #'@param kernel_bandwidth numeric. Defines kernel bandwidth. If \strong{kernel_adaptative} is TRUE, then you should define the number of local observations in the kernel, otherwise you should define a distance to specify kernel bandwidth.
 #'@param upsampling logical. If TRUE, upsampling is applied before random forest training, otherwise it is downsampled. Consider that upsampling is a bit more computing demanding but accuracy is improved.
+#'@param save_models logical. If TRUE, random forest models are stored at \strong{output_folder} as a RDS file. Beware it can be large, therefore storage requires hard drive memory and can slow down algorithm exit.
+#'@param enable_pdp logical. --EXPERIMENTAL-- If TRUE, partial dependence plots YHAT maximun, together with its correspondent independent variable value (PDP) are calculated.
 #'@param number_cores numeric. Number of cores for parallel processing. Cores are register and operated via doParallel, foreach and parallel packages. Be careful with increasing numbers of cores, as RAM memory may be not enough.
 #'@param output_folder string. Output folder where GWRFC outputs will be stored.
-#'@return As a result, a shapefile is created whose attribute table contains: \enumerate{
-#'                            \item Local variables importance: calculated via permutation for each variable and derived from each RF local models.
-#'                            \item BEST: most important variable in the local RF model.
-#'                            \item DEP: original value from dependent variable.
-#'                            \item PRED: predicted class result.
-#'                            \item P_: classification probabilities for each dependent variable classes.
-#'                            \item FAIL: Is prediction result correct (as is compared with DEP)?
-#'                            \item KAPPA: accuracy according kappa index obtained from RF local models.
-#'                            \item ID_row: an identifier to link rows with the original dataset if incomplete cases are found.
-#'                          }
-#'        Aditionally, you can check processing evolution for the parallel computing at \strong{output_folder} as: data_progress.txt
+#'@return As a result, four shapefiles are created whose prefixes refer to: \enumerate{
+#'                            \item LVI: Local variables importance. Calculated via permutation for each variable.
+#'                            \item PDP: Independent variables local maxima (class or value). Identified when YHAT reach its maximum during RF model marginalization. Calculated for each variable.
+#'                            \item YHAT: Prediction result for \strong{dependent_varName} when PDP local maxima is applied. Calculated for each variable.
+#'                            \item ACC: Prediction and accuracies: predicted class, kappa from Out-of-Bag, classes probabilities and prediction failures.
+#'                           }
+#'        In all shapefiles cases, a column called 'ID_row' refers to rownames of \strong{input_shapefile}. In addition, processing evolution can be monitored at \strong{output_folder} as: data_progress.txt
 #'@examples
 #'#with deforestation dataset
 #'data(deforestation)
 #'
-#'#as the dependent variable is a continuous value, here it is splited in quantiles
-#'deforestation@data$fao <- factor(cut(deforestation@data$fao,breaks=quantile(deforestation@data$fao,probs=seq(0,1,length.out=5)),labels=c("Q1","Q2","Q3","Q4"),include.lowest=T))
+#'#observe column names
+#'names(deforestation)
 #'
-#'#and then GWRFC is run (see coments for each parameter)
-#'GWRFC(input_shapefile = deforestation, #can be also a complete filename of .shp extension.
-#'       remove_columns = c("ID_grid","L_oth"), #these variables are ignored in the analysis as are not informative.
-#'       dependent_varName = "fao", #the depedent variable to evaluate, should be of class factor or character.
-#'       kernel_function = "exponential", #the weightening function. See above for other functions.
-#'       kernel_adaptative = T, #TRUE for adaptative or FALSE for a fixed kernel distance.
-#'       kernel_bandwidth = 400, #as the kerner is adaptative, 400 refers to the minimun number of observations.
-#'       upsampling = T, #improves accuracy but is a bit more computing costly.
-#'       number_cores = 3, #3 cores used in an AMD A6/16 GB RAM computer.
-#'       output_folder = "C:/DATA/demo/deforestation") #check this folder for outputs
+#'GWRFC(input_shapefile = deforestation,
+#'       remove_columns = c("ID_grid","L_oth"),
+#'       dependent_varName = "fao", #5 classes
+#'       kernel_function = "exponential",
+#'       kernel_adaptative = T,
+#'       kernel_bandwidth = 400,
+#'       upsampling = T,
+#'       save_models = F,
+#'       enable_pdp = F,
+#'       number_cores = 3, #3 cores available for an AMD A6/16 GB RAM computer.
+#'       output_folder = "E:/demo/test")
 #'@export
 
 GWRFC <- function(
@@ -47,6 +46,8 @@ GWRFC <- function(
   kernel_adaptative = T,
   kernel_bandwidth,
   upsampling = T,
+  save_models = F,
+  enable_pdp = F,
   number_cores = 1,
   output_folder
 ){
@@ -59,8 +60,8 @@ GWRFC <- function(
   set.seed(666)
   #folder
   dir.create(output_folder,showWarnings = F, recursive = T)
-  if(file.exists(paste0(output_folder,"/progress.txt"))){
-    unlink(paste0(output_folder,"/progress.txt"),recursive = T, force = T)
+  if(file.exists(paste0(output_folder,"/data_progress.txt"))){
+    unlink(paste0(output_folder,"/data_progress.txt"),recursive = T, force = T)
   }
   #read shp
   if(class(input_shapefile)=="SpatialPolygonsDataFrame"|class(input_shapefile)=="SpatialPointsDataFrame"){
@@ -90,7 +91,7 @@ GWRFC <- function(
     stop("Found two or more column names at input_shapefile for the specified dependent_varName. Rename it.")
   }else if(length(unique(model.shp@data[,model.dep]))>=21){
     warning(paste0("dependent_varName has ",length(unique(model.shp@data[,model.dep])),
-                " classes. Procede with caution or reduce them into around 10 interpretable classes"))
+                   " classes. Procede with caution or reduce them into around 10 interpretable classes"))
   }
   #get independent columns
   model.ind <- names(model.shp)[!grepl(dependent_varName,names(model.shp))]
@@ -113,6 +114,35 @@ GWRFC <- function(
 
   ##### FUNCTIONS ####
 
+  save.shp <- function(x,outN){
+    #merge
+    gwc.data <- lapply(gwc.extract,"[[",x)
+    gwc.data <- do.call("rbind.data.frame",gwc.data)
+    gwc.data$ID_row <- rownames(model.shp@data)
+    gwc.data <- gwc.data[,c(ncol(gwc.data),1:(ncol(gwc.data)-1))]
+    #save
+    output.shp <- model.shp
+    output.shp@data <- gwc.data
+    output.name <- paste0(output_folder,"/GWRFC_",
+                          ifelse(kernel_adaptative,"ADP_","FIX_"),
+                          kernel_bandwidth,"_",
+                          conv.name(kernel_function),
+                          paste0("_",outN,".shp"))
+    shapefile(output.shp,output.name,overwrite=T)
+    print(paste0(output.name," * stored sucessfully!"))
+  }
+  conv.name <- function(x){
+    if(x=='gaussian'){
+      x <- "GA"
+    }else if(x=='exponential'){
+      x <- "EX"
+    }else if(x=='bisquare'){
+      x <- "BI"
+    }else if(x=='bisquare'){
+      x <- "TR"
+    }
+    return(x)
+  }
   zero.variance <- function(x){
     nzv <- caret::nearZeroVar(x[-1], saveMetrics= TRUE)
     nzv.0 <- rownames(nzv)[nzv$zeroVar]
@@ -125,11 +155,23 @@ GWRFC <- function(
     return(x)
   }
   corrupted.cases <- function(){
-    cell.names <- sort(names(model.shp@data[,2:ncol(model.shp@data)]))
-    probs.class <- paste0("P_",levels(model.shp@data[,1]))
-    cell.names <- c(cell.names,"BEST","DEP","PRED",probs.class,"FAIL","KAPPA")
-    cell.out <- as.data.frame(matrix(nrow=1,ncol=length(cell.names)))
-    names(cell.out) <- cell.names
+    cell.vars <- sort(names(model.shp@data[,2:ncol(model.shp@data)]))
+    #lvi
+    cell.lvi <- as.data.frame(matrix(nrow=1,ncol=length(cell.vars)))
+    names(cell.lvi) <- cell.vars
+    #yhat
+    cell.yhat <- as.data.frame(matrix(nrow=1,ncol=length(cell.vars)))
+    names(cell.yhat) <- cell.vars
+    #pdp
+    cell.pdp <- as.data.frame(matrix(nrow=1,ncol=length(cell.vars)))
+    names(cell.pdp) <- cell.vars
+    #acc
+    cell.acc <- as.data.frame(matrix(nrow=1,ncol=length(levels(model.shp@data[,1]))+4))
+    names(cell.acc) <- c("DEP","PRED",paste0("P_",levels(model.shp@data[,1])),"FAIL","KAPPA")
+    #rf model
+    cell.rf <- NA
+    #out
+    cell.out <- list(cell.lvi,cell.yhat,cell.pdp,cell.acc,cell.rf)
     return(cell.out)
   }
   get.probs <- function(){
@@ -154,11 +196,13 @@ GWRFC <- function(
   #### GW RANDOM FOREST ####
 
   print("Start processing...")
-
   #start cluster
   cl <- makeCluster(number_cores)
   registerDoParallel(cl)
-  gwc.extract <- foreach(i=icount(length(model.shp)),.packages=c("ranger","scales","caret","GWmodel"),.errorhandling="pass") %dopar% {
+  gwc.extract <- foreach(i=1:length(model.shp),
+                         .packages=c("ranger","scales","caret","GWmodel","pdp","raster","sp"),
+                         .errorhandling="pass") %dopar% {
+    #timer
     init.time <- proc.time()
     #order data by distance
     cell.data <- model.shp@data
@@ -168,8 +212,9 @@ GWRFC <- function(
     }else{
       cell.data <- cell.data[cell.data$dist < kernel_bandwidth,]
     }
-    #get 'i' observation
+    #get 'i' observation & rows index
     cell.i <- cell.data[1,]
+    cell.pos <- as.numeric(rownames(cell.data))
     #CORRUPTED CASE 1: only one observation
     if(nrow(cell.data)==1){
       cell.out <- corrupted.cases()
@@ -225,38 +270,70 @@ GWRFC <- function(
                                     probability=T,
                                     importance="permutation")
         }
-        #extract importance
-        cell.out <- data.frame(t(matrix(cell.rf$variable.importance)))
-        names(cell.out) <- names(cell.rf$variable.importance)
-        cell.out[,cell.out < 0] <- 0
-        #add eliminated columns as 0 + sort
-        cell.rem <- cell.vars[!cell.vars %in% names(cell.out)]
+        #extract LVI
+        cell.lvi <- data.frame(t(matrix(cell.rf$variable.importance)))
+        names(cell.lvi) <- names(cell.rf$variable.importance)
+        cell.lvi[,cell.lvi < 0] <- 0
+        cell.rem <- cell.vars[!cell.vars %in% names(cell.lvi)]
         if(length(cell.rem!=0)){
-          cell.val <- as.data.frame(t(matrix(rep(0,length(cell.rem)))))
+          cell.val <- as.data.frame(t(matrix(rep(NA,length(cell.rem)))))
           names(cell.val) <- cell.rem
-          cell.out <- cbind(cell.out,cell.val)
+          cell.lvi <- cbind(cell.lvi,cell.val)
         }
-        cell.out <- cell.out[sort(names(cell.out))]
-        #get best variable
-        cell.out$BEST <- head(names(cell.out[order(cell.out,decreasing=T)]),3)[1]
-        #get dependent
-        cell.out$DEP <- as.character(cell.i[,1])
-        #get prediction
-        cell.out$PRED <- get.probsClass()[[1]]
-        #get probabilities
-        cell.out.prob <- get.probsClass()[[2]]
-        if(length(cell.out.prob)!=dep.len){
+        cell.lvi <- cell.lvi[sort(names(cell.lvi))]
+        #apply PDP
+        if(enable_pdp){
+          cell.pdp <- lapply(names(cell.rf$variable.importance),function(x){
+            x <- pdp::partial(cell.rf,
+                              pred.var = x,
+                              grid.resolution = 5,
+                              train = cell.data,
+                              type = "classification",
+                              parallel = F)
+            x <- x[which.max(x[,2]),]
+            return(x)
+          })
+          #extract yhat
+          cell.yhat <- as.data.frame(lapply(cell.pdp,"[[",2),stringsAsFactors=F)
+          names(cell.yhat) <- names(cell.rf$variable.importance)
+          if(length(cell.rem!=0)){
+            cell.val <- as.data.frame(t(matrix(rep(NA,length(cell.rem)))))
+            names(cell.val) <- cell.rem
+            cell.yhat <- cbind(cell.yhat,cell.val)
+          }
+          cell.yhat <- cell.yhat[sort(names(cell.yhat))]
+          #extract max values
+          cell.pdp <- as.data.frame(lapply(cell.pdp,"[[",1),stringsAsFactors=F)
+          names(cell.pdp) <- names(cell.rf$variable.importance)
+          if(length(cell.rem!=0)){
+            cell.val <- as.data.frame(t(matrix(rep(NA,length(cell.rem)))))
+            names(cell.val) <- cell.rem
+            cell.pdp <- cbind(cell.pdp,cell.val)
+          }
+          cell.pdp <- cell.pdp[sort(names(cell.pdp))]
+        }else{
+          cell.yhat <- as.data.frame(matrix(nrow=1,ncol=length(cell.vars)))
+          names(cell.yhat) <- cell.vars
+          cell.pdp <- as.data.frame(matrix(nrow=1,ncol=length(cell.vars)))
+          names(cell.pdp) <- cell.vars
+        }
+        #extract accuracies
+        cell.acc <- data.frame(DEP=as.character(cell.i[,1]))
+        cell.acc$PRED <- get.probsClass()[[1]]
+        cell.acc.prob <- get.probsClass()[[2]]
+        if(length(cell.acc.prob)!=dep.len){
           miss.class <- as.data.frame(matrix(rep(0,dep.len),nrow=1,ncol=dep.len))
           names(miss.class) <- dep.nam
-          miss.class[which(dep.nam %in% names(cell.out.prob))] <- cell.out.prob
-          cell.out.prob <- miss.class
+          miss.class[which(dep.nam %in% names(cell.acc.prob))] <- cell.acc.prob
+          cell.acc.prob <- miss.class
         }
-        names(cell.out.prob) <- paste0("P_", names(cell.out.prob))
-        cell.out <- cbind(cell.out,as.data.frame(cell.out.prob))
-        #get accuracies metrics
-        cell.out$FAIL <- ifelse(cell.out$DEP!=cell.out$PRED,"yes","no")
-        cell.out$KAPPA <- get.kappa()
+        names(cell.acc.prob) <- paste0("P_", names(cell.acc.prob))
+        cell.acc <- cbind(cell.acc,as.data.frame(cell.acc.prob))
+        cell.acc$FAIL <- ifelse(cell.acc$DEP!=cell.acc$PRED,"yes","no")
+        cell.acc$KAPPA <- get.kappa()
       }
+      #close
+      cell.out <- list(cell.lvi,cell.yhat,cell.pdp,cell.acc,cell.rf)
     }
     #status text
     init.time <- round(proc.time()-init.time,2)
@@ -266,27 +343,36 @@ GWRFC <- function(
     return(cell.out)
   }
   stopCluster(cl)
-  #consolidate results
-  gwc.data <- do.call("rbind.data.frame",gwc.extract)
-  #add original rownames
-  gwc.data$ID_row <- rownames(model.shp@data)
 
-  #### SAVE SHAPEFILE ####
+  #### SAVE SHAPEFILES ####
 
   print("Start saving...")
 
-  #save shapefile
-  model.shp@data <- gwc.data
-  output.name <- paste0(output_folder,"/GWRFC_",
-                        ifelse(kernel_adaptative,"ADP_","FIX_"),
-                        kernel_bandwidth,"_",
-                        kernel_function,".shp")
-  shapefile(model.shp,output.name,overwrite=T)
+  save.shp(1,"LVI")
+  if(enable_pdp){
+    save.shp(2,"YHAT")
+    save.shp(3,"PDP")
+  }
+  save.shp(4,"ACC")
+
+  #### SAVE RF MODELS ####
+
+  if(save_models){
+    rf.models <- lapply(gwc.extract,"[[",5)
+    rf.models <- rf.models[!is.na(rf.models)]
+    output.name <- paste0(output_folder,"/GWRFC_",
+                          ifelse(kernel_adaptative,"ADP_","FIX_"),
+                          kernel_bandwidth,"_",
+                          conv.name(kernel_function),
+                          paste0("_MODELS.rds"))
+    saveRDS(rf.models,output.name)
+    print(paste0(output.name," * stored sucessfully!"))
+  }
+
   #error warning
   if(length(which(is.na(model.shp@data$PRED)))!=0){
     warning(paste0(length(which(is.na(model.shp@data$PRED)))," observations were not possible to evaluate during Random Forest execution."))
   }
   #end
-  print(paste0("check file: ",basename(output.name)))
   print("****GWRFC end sucessfully*****")
 }
