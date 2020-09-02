@@ -8,7 +8,9 @@
 #'@param output_folder string. Output folder where LVIclust outputs will be stored.
 #'@return The output of this function is a shapefile with the resulting clusters and its plot if it was specified.
 #'@examples
-#'#based in the example showed with the execution of GWRFC#'
+#'
+#'#based in the example showed with the execution of GWRFC
+#'
 #'LVIclust(input_LVI = "E:/demo/deforestation/GWRFC_ADP_400_EX_LVI.shp", #filename of the GWRFC LVI output
 #'remove_columns=NA,
 #'method_clustering="mclust", #hierarchical clustering is applied here.
@@ -73,7 +75,7 @@ LVIclust <- function(
       if(all(is.na(x[,j]))){
         plot(0,type='n',axes=FALSE,ann=FALSE)
       }else{
-        plot(som_model,
+        plot(som.model,
              type = "property",
              property=x[,j],
              main=names(x)[j],
@@ -125,7 +127,7 @@ LVIclust <- function(
         if(j!=7){
           plot(som.model, type=som.plots[j])
         }else{
-          plot(som_model,
+          plot(som.model,
                type = "property",
                property=som.cluster,
                main="clusters")

@@ -54,12 +54,17 @@ As a result, four shapefiles are created whose prefixes refer to: \enumerate{
 GWRFC is a software for analyze and explore spatial data. It constructs geographically weighted models (GW; Fotheringham et al. 1998) to train random forest (RF; Breiman 2001) and report local models with partial depende plots (PDP, Greenwell, 2019). Prediction results and accurancy metrics (ACC) are also representated accondingly.
 }
 \examples{
+
 #view deforestation data
+
 data("deforestation")
 tmap_mode("view")
 tm_basemap("OpenStreetMap") +
  tm_shape(deforestation) +
- tm_polygons(col="fao",style="cat",title="Annual deforestation rate  2000-2010 (FAO) - categorical (quantiles)",palette="YlOrRd")#'#run GWRFC
+ tm_polygons(col="fao",style="cat",title="Annual deforestation rate  2000-2010 (FAO) - categorical (quantiles)",palette="YlOrRd")
+
+#run GWRFC
+
 GWRFC(input_shapefile = deforestation, #can be a spatial dataframe (points or polygons) or the complete filename of the shapefile to analyze.
      remove_columns = c("ID_grid","L_oth"), #for remove variables if they are not informative. Put NA to avoid removal.
      dependent_varName = "fao", #the depedent variable to evaluate. It should be of factor or character data type.

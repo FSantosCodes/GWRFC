@@ -19,12 +19,17 @@
 #'                           }
 #'        In all shapefiles cases, a column called 'ID_row' refers to rownames of \strong{input_shapefile}. In addition, processing evolution can be monitored at \strong{output_folder} as: data_progress.txt
 #'@examples
+#'
 #'#view deforestation data
+#'
 #'data("deforestation")
 #'tmap_mode("view")
 #'tm_basemap("OpenStreetMap") +
 #'  tm_shape(deforestation) +
-#'  tm_polygons(col="fao",style="cat",title="Annual deforestation rate  2000-2010 (FAO) - categorical (quantiles)",palette="YlOrRd")#'#run GWRFC
+#'  tm_polygons(col="fao",style="cat",title="Annual deforestation rate  2000-2010 (FAO) - categorical (quantiles)",palette="YlOrRd")
+#'
+#'#run GWRFC
+#'
 #'GWRFC(input_shapefile = deforestation, #can be a spatial dataframe (points or polygons) or the complete filename of the shapefile to analyze.
 #'      remove_columns = c("ID_grid","L_oth"), #for remove variables if they are not informative. Put NA to avoid removal.
 #'      dependent_varName = "fao", #the depedent variable to evaluate. It should be of factor or character data type.

@@ -33,7 +33,9 @@ The output of this function is a shapefile with the resulting clusters and its p
 This function clusters local variables importance (LVI) output with different methods, including: Gaussian Mixture Modelling (mclust), Kohonen's Self-Organizing Maps (kohonen), or hierarchical clustering (hclust)
 }
 \examples{
-#based in the example showed with the execution of GWRFC#'
+
+#based in the example showed with the execution of GWRFC
+
 LVIclust(input_LVI = "E:/demo/deforestation/GWRFC_ADP_400_EX_LVI.shp", #filename of the GWRFC LVI output
 remove_columns=NA,
 method_clustering="mclust", #hierarchical clustering is applied here.
