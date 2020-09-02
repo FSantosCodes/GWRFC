@@ -5,7 +5,7 @@
 #' @format A SpatialPolygonsDataFrame with 2418 rows and 37 variables:
 #' \describe{
 #'   \item{ID_grid}{an unique numeric identifier for each grid cell}
-#'   \item{fao}{annual deforestation rate (2000-2010)}
+#'   \item{fao}{annual deforestation rate (2000-2010, classified as quantiles)}
 #'   \item{A_cao}{Accessibility to coffee and cacao collection centers (minutes ~ scaled 0-1)}
 #'   \item{A_fru}{Accessibility to fruits collection centers (minutes ~ scaled 0-1)}
 #'   \item{A_mlk}{Accessibility to milk collection centers (minutes ~ scaled 0-1)}

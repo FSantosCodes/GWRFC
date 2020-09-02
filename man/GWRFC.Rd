@@ -54,21 +54,22 @@ As a result, four shapefiles are created whose prefixes refer to: \enumerate{
 GWRFC is a software for analyze and explore spatial data. It constructs geographically weighted models (GW; Fotheringham et al. 1998) to train random forest (RF; Breiman 2001) and report local models with partial depende plots (PDP, Greenwell, 2019). Prediction results and accurancy metrics (ACC) are also representated accondingly.
 }
 \examples{
-#with deforestation dataset
-data(deforestation)
+#view deforestation data
+data("deforestation")
+tmap_mode("view")
+tm_basemap("OpenStreetMap") +
+ tm_shape(deforestation) +
+ tm_polygons(col="fao",style="cat",title="Annual deforestation rate  2000-2010 (FAO) - categorical (quantiles)",palette="YlOrRd")#'#run GWRFC
+GWRFC(input_shapefile = deforestation, #can be a spatial dataframe (points or polygons) or the complete filename of the shapefile to analyze.
+     remove_columns = c("ID_grid","L_oth"), #for remove variables if they are not informative. Put NA to avoid removal.
+     dependent_varName = "fao", #the depedent variable to evaluate. It should be of factor or character data type.
+     kernel_function = "exponential", #the weightening function. See help for other available functions.
+     kernel_adaptative = T, #use TRUE for adaptative kernel distance or FALSE for a fixed kernel distance.
+     kernel_bandwidth = 400, #as the kernel is adaptative, 400 refers to the minimun number of observations to use in modelling.
+     upsampling = T, #improves accuracy (recommended) but is a bit more computing costly.
+     save_models = T, #save RF models. Beware of hard disk space and extra processing time.
+     enable_pdp = F, #experimental, use with caution as is sensible to noise.
+     number_cores = 3, #defines the number of CPU cores to use
+     output_folder = "E:/demo/deforestation") #check this folder for GWRFC outputs.
 
-#observe column names
-names(deforestation)
-
-GWRFC(input_shapefile = deforestation,
-      remove_columns = c("ID_grid","L_oth"),
-      dependent_varName = "fao", #5 classes
-      kernel_function = "exponential",
-      kernel_adaptative = T,
-      kernel_bandwidth = 400,
-      upsampling = T,
-      save_models = F,
-      enable_pdp = F,
-      number_cores = 3, #3 cores available for an AMD A6/16 GB RAM computer.
-      output_folder = "E:/demo/test")
 }
