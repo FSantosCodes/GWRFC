@@ -5,6 +5,7 @@ Description: Commonly, spatial data requires non-stationary modelling to capture
 Author: Fabian Santos [aut, cre]
 Maintainer: Fabian Santos <fabian_santos_@hotmail.com>
 License: GPL-3
+Encoding: UTF-8
 URL: https://github.com/FSantosCodes; http://rpubs.com/schwarzervogel10/526484
 Imports:
   caret,
